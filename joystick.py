@@ -35,9 +35,24 @@ def _init_serial(tty, baudrate):
 
 
 def _calculate_servo_positions(x, y, z, s):
+    # x = roll y= pitch z= yaw s = speed
     # Y = (X-A)/(B-A) * (D-C) + C
     # joystick out: A = -1 B = 1 (from -1 to 1) servo in: C = 0 D = 180 (from 0 to 180)
-    return [(i - -1) / (1 - -1) * (180 - 0) for i in (x, y, z, s)]
+
+    x1 = -x + y
+    y1 = -x - y
+    s = -s
+
+    if x1 > 1:
+        x1 = 1
+    if x1 < -1:
+        x1 = -1
+    if y1 > 1:
+        y1 = 1
+    if y1 < -1:
+        y1 = -1
+
+    return [(i - -1) / (1 - -1) * (180 - 0) for i in (x1, y1, z, s)]
 
 
 def _write_serial(interface, x, y, z, s):
