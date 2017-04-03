@@ -55,16 +55,20 @@ void readSerial()
 
 void printP()
 {
+  update_volt_amp();
   Serial.print("$P");
-  Serial.write(akku_v>>8); //MSB
-  Serial.write(akku_v&B11111111); //LSB
-  Serial.write(akku_i>>akku_v); //MSB
-  Serial.write(akku_i&B11111111); //LSB
+  int16_t tmp=(int16_t) flightcontrol_sensors.amp*1000;
+  Serial.write(tmp>>8); //MSB
+  Serial.write(tmp&B11111111); //LSB
+  tmp=(int16_t) flightcontrol_sensors.volt*1000;
+  Serial.write(tmp>>8); //MSB
+  Serial.write(tmp&B11111111); //LSB
   Serial.write('\n');
 
 }
 void printM()
 {
+  update_mag();
   Serial.print("$M");
   Serial.write(flightcontrol_sensors.mag[0]>>8); //MSB
   Serial.write(flightcontrol_sensors.mag[0]&B11111111); //LSB
@@ -74,8 +78,23 @@ void printM()
   Serial.write(flightcontrol_sensors.mag[2]&B11111111); //LSB
    Serial.write('\n');
 }
+
+void printTP()
+{
+  update_mag();
+  Serial.print("$T");
+  Serial.write(flightcontrol_sensors.pres>>8); //MSB
+  Serial.write(flightcontrol_sensors.pres&B11111111); //LSB
+  int16_t tmp=(int16_t) flightcontrol_sensors.temp*10.0;
+  Serial.write(tmp>>8); //MSB
+  Serial.write(tmp&B11111111); //LSB
+  
+  Serial.write('\n');
+}
+
 void printF()
 {
+  update_gyr_acc(); 
   //Gyro xyz
   //Acc xyz
   Serial.print("$F");
@@ -93,6 +112,7 @@ void printF()
   Serial.write(flightcontrol_sensors.acc[2]&B11111111); //LSB 
    Serial.write('\n');
 }
+
 
 void sendTelemetry()
 {

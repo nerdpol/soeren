@@ -1,3 +1,26 @@
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BMP085_U.h>
+#include <Adafruit_INA219.h>
+
+Adafruit_INA219 ina219;
+
+// Nur für 9AxisSensor
+#define    MPU9250_ADDRESS            0x68
+#define    MAG_ADDRESS                0x0C
+
+#define    GYRO_FULL_SCALE_250_DPS    0x00  
+#define    GYRO_FULL_SCALE_500_DPS    0x08
+#define    GYRO_FULL_SCALE_1000_DPS   0x10
+#define    GYRO_FULL_SCALE_2000_DPS   0x18
+
+#define    ACC_FULL_SCALE_2_G        0x00  
+#define    ACC_FULL_SCALE_4_G        0x08
+#define    ACC_FULL_SCALE_8_G        0x10
+#define    ACC_FULL_SCALE_16_G       0x18
+//Ende nur für 9AxisSensor
+Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085);
+
 
 #include <Servo.h>
 Servo s1;
@@ -23,6 +46,7 @@ struct control_sensor_struct{
   float temp; 
   float amp; 
   float volt; };
+  
 typedef control_sensor_struct flightcontrol_sensors_t;
 flightcontrol_sensors_t flightcontrol_sensors;
 
@@ -51,7 +75,9 @@ void setup() {
   s4.write(90);
   s5.write(0);
 
-  
+    setup_pres_temp();  
+    ina219.begin(); //setup_volt_amp
+    setup_9axis(); 
   time = millis() + looplength;
 
 }
