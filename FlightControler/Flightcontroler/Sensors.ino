@@ -77,7 +77,7 @@ uint16_t update_pres_temp(void)
   /* Display the results (barometric pressure is measure in hPa) */
   if (event.pressure)
   {
-    flightcontrol_sensors.pres=event.pressure;
+    flightcontrol_sensors.pres=event.pressure*10;
 
     /* Calculating altitude with reasonable accuracy requires pressure    *
      * sea level pressure for your position at the moment the data is     *
