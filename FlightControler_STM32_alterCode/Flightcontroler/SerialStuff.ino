@@ -5,7 +5,7 @@ void readSerial1()
    while (Serial1.available() > 0)
   {
      ringbuf_put(&protocol_buffer, Serial1.read());
-     decode(&protocol_buffer, &handle);
+     decode(&protocol_buffer, &handle_packet);
   }
 }
 
@@ -53,48 +53,6 @@ void printTP()
 
 }
 
-void printG()
-{
-  // G lat s32bit long s32 alt u16 links u8 yan s16/100 grad, velocity u16 cm/s
-int32_t tmp;
-uint16_t tmp1;
-uint8_t tmp2;
-resetTeleChecksum();
-writeTeleData('G');
-
-union {
-  float f;
-  uint32_t u;
-} fu;
-
-fu.f = gps.location.lat();
-writeTeleData(fu.u>>24);
-writeTeleData(fu.u>>16 &0xFF);
-writeTeleData(fu.u>>8 &0xFF);
-writeTeleData(fu.u&0xFF);
-
-fu.f = gps.location.lng();
-writeTeleData(fu.u>>24);
-writeTeleData(fu.u>>16 &0xFF);
-writeTeleData(fu.u>>8 &0xFF);
-writeTeleData(fu.u&0xFF);
-
-tmp1= (uint16_t) gps.altitude.meters();
-writeTeleData(tmp1>>8 &0xFF);
-writeTeleData(tmp1&0xFF);
-
-writeTeleData((uint8_t) gps.satellites.value());
-
-tmp1=(uint16_t) gps.course.deg()*100;
-writeTeleData(tmp1>>8 &0xFF);
-writeTeleData(tmp1&0xFF);
-
-tmp1=(uint16_t) gps.speed.mps()*100;
-writeTeleData(tmp1>>8 &0xFF);
-writeTeleData(tmp1&0xFF);
-writeTeleChecksum();
-  
-}
 void printF()
 {
   update_gyr_acc();
@@ -138,15 +96,14 @@ void sendTelemetry()
 {
   printF();
 
-  if (tele_cnt == 5 || tele_cnt == 10 )
+  if (tele_cnt == 4 || tele_cnt == 8)
   {
     printM();
   }
-  if (tele_cnt >= 16)
+  if (tele_cnt >= 9)
   {
     printP();
     printTP();
-    printG();
     tele_cnt = 0;
   }
 

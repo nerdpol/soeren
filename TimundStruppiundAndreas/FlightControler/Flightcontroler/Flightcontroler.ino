@@ -1,46 +1,11 @@
 
-
-/*
- * SCL =B6
- * SDA=B7
- * 
- * TX1=A9
- * RX1=A10
- * 
- * TX3=PB10
- * RX3= PB11
- * Servo1=PA0
- * Servo2=PA1
- * Servo3=PA2
- * Servo4=PA3
- * Servo5=PA6
- * 
- * For switching between GyroMeters / ADO Port
- * To overcome problem of same I2C Adress
- * Enable/Disable_Gyro1=PA11
- * Enable/Disable_Gyro2=PA15
- * 
- * weiter PWM
- * PA7
- * PB0
- * PB1
- * 
- * Transceiver SET
- * PA12
- * 
- * SPI for SD-Card
- * NSS2 = PB12
- * SCK2 = PB13
- * MISO2= PB14
- * MOSI2= PB15
- */
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP085_U.h>
 #include <Adafruit_INA219.h>
-#include <TinyGPS++.h>
+
 Adafruit_INA219 ina219;
-TinyGPSPlus gps;
+
 // Nur für 9AxisSensor
 #define    MPU9250_ADDRESS            0x68
 #define    MAG_ADDRESS                0x0C
@@ -57,19 +22,24 @@ TinyGPSPlus gps;
 //Ende nur für 9AxisSensor
 Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085);
 
+#define BUFFER_FAIL     0
+#define BUFFER_SUCCESS  1
+
+#define BUFFER_SIZE 20
+
+struct Buffer {
+  uint8_t data[BUFFER_SIZE];
+  uint8_t read; // zeigt auf das Feld mit dem ältesten Inhalt
+  uint8_t write; // zeigt immer auf leeres Feld
+} buffer = {{}, 0, 0};
+
+
 #include <Servo.h>
 Servo s1;
 Servo s2;
 Servo s3;
 Servo s4;
 Servo s5;
-
-struct ringbuf {
-  uint8_t buffer[64];
-  uint8_t * head;
-  uint8_t * tail;
-};
-struct ringbuf protocol_buffer;
 
 #define looplength 100
 //#define debug 1
@@ -88,7 +58,17 @@ struct control_sensor_struct {
   float volt;
 };
 
+struct nvp {
+  uint8_t type;
+  unsigned int length;
+};
 
+#define NODATATYPES 1
+
+struct datatypes_t {
+  unsigned int noTypes = NODATATYPES;
+  struct nvp types[NODATATYPES] = {{'c',5}};
+}datatypes;
 
 typedef control_sensor_struct flightcontrol_sensors_t;
 flightcontrol_sensors_t flightcontrol_sensors;
@@ -104,24 +84,14 @@ uint16_t lidar;
 
 // the setup function runs once when you press reset or power the board
 void setup() {  
-  Serial1.begin(115200);
-  Serial1.println("$D Flightcontroler V0.1 awesome DM Project");
-  Serial3.begin(9600);
-  
+  Serial.begin(115200);
+  Serial.println("$D Flightcontroler V0.1 awesome DM Project");
   pinMode(13, OUTPUT);
-  ringbuf_init(&protocol_buffer);
-           
-  s1.attach(PA0);
-  s2.attach(PA1);
-  s3.attach(PA2);
-  s4.attach(PA3);
-  s5.attach(PA6);
-
-  s1.write(90);
-  s2.write(90);
-  s3.write(90);
-  s4.write(90);
-  s5.write(90);
+  s1.attach(7);
+  s2.attach(6);
+  s3.attach(5);
+  s4.attach(4);
+  s5.attach(3);
   for (uint8_t cnt = 0; cnt < 5; cnt++)
   {
     servos[cnt] = 90;
@@ -135,20 +105,17 @@ void setup() {
 }
 
 void loop() {
-  readSerial1();
-  byte data;
- while (Serial3.available())
- {
-      data=Serial3.read();
-      gps.encode(data);
-      //Serial1.print((char) data);   
- }
- 
+  readSerial();
+
   if (millis() > time)
   {
     //Hier passiert die Regelung irgendwann!
+    s1.write(servos[0]);
+    s2.write(servos[1]);
+    s3.write(servos[2]);
+    s4.write(servos[3]);
+    s5.write(servos[4]);
     sendTelemetry();
-    
     time = time + looplength;
   }
 
