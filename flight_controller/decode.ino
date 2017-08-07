@@ -66,9 +66,9 @@ void decode(struct ringbuf * buf, void (*handle)(union packet *)) {
 			case 'c':
 				packet_size = sizeof(packet.control);
 				break;
-      case 'i':
-        packet_size = 1;
-        break;
+			case 'i':
+				packet_size = 1;
+				break;
 		}
 
 		if (packet_size > 0) { //possibly a packet
@@ -107,16 +107,16 @@ void handle(union packet * packet) {
 			s4.write(packet->control.control[3]);
 			s5.write(packet->control.control[4]);
 			break;
-    case 'i':
-      Serial.println("Info: -------------------------");
-      Serial.print("Mag ("); Serial.print(flightcontrol_sensors.mag[0]); Serial.print(" "); Serial.print(flightcontrol_sensors.mag[1]); Serial.print(" "); Serial.print(flightcontrol_sensors.mag[2]); Serial.println(")");
-      Serial.print("Acc ("); Serial.print(flightcontrol_sensors.acc[0]); Serial.print(" "); Serial.print(flightcontrol_sensors.acc[1]); Serial.print(" "); Serial.print(flightcontrol_sensors.acc[2]); Serial.println(")");
-      Serial.print("Gyr ("); Serial.print(flightcontrol_sensors.gyr[0]); Serial.print(" "); Serial.print(flightcontrol_sensors.gyr[1]); Serial.print(" "); Serial.print(flightcontrol_sensors.gyr[2]); Serial.println(")");
-      Serial.print("Temp "); Serial.print(flightcontrol_sensors.temp); Serial.print(" | Pr "); Serial.print(flightcontrol_sensors.pres); Serial.println("");
-      Serial.print("Volt "); Serial.print(flightcontrol_sensors.volt); Serial.print(" | Amp "); Serial.print(flightcontrol_sensors.amp); Serial.println("");
-      Serial.print("Servos ("); Serial.print(servos[0]); Serial.print(" "); Serial.print(servos[1]); Serial.print(" "); Serial.print(servos[2]); Serial.print(" "); Serial.print(servos[3]); Serial.print(" "); Serial.print(servos[4]); Serial.println(")");
-      Serial.println("-------------------------------");
-      break;
+		case 'i':
+			Serial.println("Info: -------------------------");
+			Serial.print("Mag ("); Serial.print(flightcontrol_sensors.mag[0]); Serial.print(" "); Serial.print(flightcontrol_sensors.mag[1]); Serial.print(" "); Serial.print(flightcontrol_sensors.mag[2]); Serial.println(")");
+			Serial.print("Acc ("); Serial.print(flightcontrol_sensors.acc[0]); Serial.print(" "); Serial.print(flightcontrol_sensors.acc[1]); Serial.print(" "); Serial.print(flightcontrol_sensors.acc[2]); Serial.println(")");
+			Serial.print("Gyr ("); Serial.print(flightcontrol_sensors.gyr[0]); Serial.print(" "); Serial.print(flightcontrol_sensors.gyr[1]); Serial.print(" "); Serial.print(flightcontrol_sensors.gyr[2]); Serial.println(")");
+			Serial.print("Temp "); Serial.print(flightcontrol_sensors.temp); Serial.print(" | Pr "); Serial.print(flightcontrol_sensors.pres); Serial.println("");
+			Serial.print("Volt "); Serial.print(flightcontrol_sensors.volt); Serial.print(" | Amp "); Serial.print(flightcontrol_sensors.amp); Serial.println("");
+			Serial.print("Servos ("); Serial.print(servos[0]); Serial.print(" "); Serial.print(servos[1]); Serial.print(" "); Serial.print(servos[2]); Serial.print(" "); Serial.print(servos[3]); Serial.print(" "); Serial.print(servos[4]); Serial.println(")");
+			Serial.println("-------------------------------");
+			break;
 	}
 }
 

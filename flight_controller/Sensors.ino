@@ -143,7 +143,7 @@ void displaySensorDetails(void) {
 	Serial1.print  ("Unique ID:    "); Serial1.println(sensor.sensor_id);
 	Serial1.print  ("Max Value:    "); Serial1.print(sensor.max_value); Serial1.println(" hPa");
 	Serial1.print  ("Min Value:    "); Serial1.print(sensor.min_value); Serial1.println(" hPa");
-	Serial1.print  ("Resolution:   "); Serial1.print(sensor.resolution); Serial1.println(" hPa");  
+	Serial1.print  ("Resolution:   "); Serial1.print(sensor.resolution); Serial1.println(" hPa");
 	Serial1.println("------------------------------------");
 	Serial1.println("");
 	delay(500);
