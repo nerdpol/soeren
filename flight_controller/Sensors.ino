@@ -50,9 +50,8 @@ bool update_mag(void) {
 }
 
 uint16_t update_volt_amp(void) {
-	flightcontrol_sensors.volt = ina219.getShuntVoltage_mV()/1000; // Voltage between Vin- and Vin+
-	//flightcontrol_sensors.voltbus = ina219.getBusVoltage_V();      //Voltage between Vin- and Gnd
-	flightcontrol_sensors.amp = ina219.getCurrent_mA()/1000;    //Current over Klemme
+  flightcontrol_sensors.volt =ina219.getBusVoltage_V();
+	flightcontrol_sensors.amp = ina219.getCurrent_mA()/1000.f;
 }
 
 uint16_t update_pres_temp(void) {

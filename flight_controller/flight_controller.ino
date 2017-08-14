@@ -1,46 +1,41 @@
 /*
- * SCL=B6
- * SDA=B7
+ * I2C
+ *    SCL   B6
+ *    SDA   B7
  * 
- * %HC-12
- * TX1=A9
- * RX1=A10
- * SET Controller A12
+ * HC-12 (UART1)
+ *    TX   A9 (TX1)
+ *    RX   A10 (RX1)
+ *    SET  A12
  * 
- * TX3=PB10
- * RX3= PB11
- * Servo1=PA0
- * Servo2=PA1
- * Servo3=PA2
- * Servo4=PA3
- * Servo5=PA6
+ * GPS (UART3)
+ *    TX  B10 (TX3)
+ *    RX  B11 (RX2)
+ * 
+ * Servos
+ *    Servo1  A0
+ *    Servo2  A1
+ *    Servo3  A2
+ *    Servo4  A3
+ *    Servo5  A6
  * 
  * For switching between GyroMeters / ADO Port
  * To overcome problem of same I2C Adress
- * Enable/Disable_Gyro1=PA11
- * Enable/Disable_Gyro2=PA15
+ *    Enable/Disable_Gyro1  A11
+ *    Enable/Disable_Gyro2  A15
  * 
  * weiter PWM
- * PA7
- * PB0
- * PB1
+ *    A7
+ *    B0
+ *    B1
  * 
- * Transceiver SET
- * PA12
- * 
- * SPI for SD-Card
- * NSS2 = PB12
- * SCK2 = PB13
- * MISO2= PB14
- * MOSI2= PB15
- *     Using the second SPI port (SPI_2)
-		SS    <-->  PB12 <-->  BOARD_SPI2_NSS_PIN
-		SCK   <-->  PB13 <-->  BOARD_SPI2_SCK_PIN
-		MISO  <-->  PB14 <-->  BOARD_SPI2_MISO_PIN
-		MOSI  <-->  PB15 <-->  BOARD_SPI2_MOSI_PIN
-		SI
-		CS=A15
-		Interupt =B5
+ * SPI for SD-Card (SPI2
+ *    NSS2    B12 (NSS2)
+ *    SCK2    B13 (SCK2)
+ *    MISO2   B14 (MISO2)
+ *    MOSI2   B15 (MOSI2)
+ *    CS      A15
+ *    INT     B5
 */
 
 #include <Wire.h>

@@ -9,10 +9,10 @@ void printP() {
 	update_volt_amp();
 	resetTeleChecksum();
 	writeTeleData('P');
-	int16_t tmp = (int16_t) flightcontrol_sensors.amp * 1000;
+	int16_t tmp = (int16_t)(flightcontrol_sensors.amp * 1000);
 	writeTeleData(tmp >> 8);
 	writeTeleData(tmp & 0xff);
-	tmp = (int16_t) flightcontrol_sensors.volt * 1000;
+	tmp = (int16_t)(flightcontrol_sensors.volt * 1000);
 	writeTeleData(tmp >> 8);
 	writeTeleData(tmp & 0xff);
 	writeTeleChecksum();
@@ -37,7 +37,7 @@ void printTP() {
 	writeTeleData('T');
 	writeTeleData(flightcontrol_sensors.pres >> 8);
 	writeTeleData(flightcontrol_sensors.pres & 0xff);
-	int16_t tmp = (int16_t) flightcontrol_sensors.temp * 10.0;
+	int16_t tmp = (int16_t)(flightcontrol_sensors.temp * 10.0);
 	writeTeleData(tmp >> 8);
 	writeTeleData(tmp & 0xff);
 	writeTeleChecksum();
@@ -72,11 +72,11 @@ void printG() {
 
 	writeTeleData((uint8_t) gps.satellites.value());
 
-	tmp = (uint16_t)gps.course.deg()*100;
+	tmp = (uint16_t)(gps.course.deg() * 100);
 	writeTeleData(tmp >> 8 & 0xff);
 	writeTeleData(tmp & 0xff);
 
-	tmp = (uint16_t)gps.speed.mps()*100;
+	tmp = (uint16_t)(gps.speed.mps( ) *100);
 	writeTeleData(tmp >> 8 & 0xff);
 	writeTeleData(tmp & 0xff);
 	writeTeleChecksum();
