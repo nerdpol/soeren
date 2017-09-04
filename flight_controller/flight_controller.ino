@@ -38,113 +38,116 @@
  *    INT     B5
 */
 
-#include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BMP085_U.h>
-#include <Adafruit_INA219.h>
-#include <TinyGPS++.h>
-#include <Servo.h>
+#include "radio_packet.h"
 
 #define looplength 100
-//#define debug 1
-
-#define    MPU9250_ADDRESS            0x68
-#define    MAG_ADDRESS                0x0C
-
-#define    GYRO_FULL_SCALE_250_DPS    0x00
-#define    GYRO_FULL_SCALE_500_DPS    0x08
-#define    GYRO_FULL_SCALE_1000_DPS   0x10
-#define    GYRO_FULL_SCALE_2000_DPS   0x18
-
-#define    ACC_FULL_SCALE_2_G        0x00
-#define    ACC_FULL_SCALE_4_G        0x08
-#define    ACC_FULL_SCALE_8_G        0x10
-#define    ACC_FULL_SCALE_16_G       0x18
-//Ende nur für 9AxisSensor
-
-Adafruit_INA219 ina219;
-TinyGPSPlus gps;
-Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085);
-Servo s1;
-Servo s2;
-Servo s3;
-Servo s4;
-Servo s5;
-
-struct ringbuf {
-	uint8_t buffer[64];
-	uint8_t * head;
-	uint8_t * tail;
-};
-struct ringbuf protocol_buffer;
-
-unsigned long time;
 
 typedef struct {
-	uint16_t pres;
+	uint16_t pressure;
 	uint16_t acc[3];
 	uint16_t mag[3];
 	uint16_t gyr[3];
-	float temp;
-	float amp;
-	float volt;
+	float temperature;
+	float current;
+	float voltage;
+	float latitude;
+	float longitude;
+	uint16_t altitude;
+	uint8_t links;
+	float yaw;
+	float velocity;
 } flightcontrol_sensors_t;
 flightcontrol_sensors_t flightcontrol_sensors;
 
-uint8_t servos[5]; // c.....P
+unsigned long time;
 
 void setup() {
-	// HC-12 Radio
-	pinMode(PA12, OUTPUT);
-	digitalWrite(PA12,HIGH);
-	delay(100);
-	Serial1.begin(115200);
-	Serial1.println("$D Flightcontroler V0.1 awesome DM Project");
-	Serial3.begin(9600);
-	ringbuf_init(&protocol_buffer);
+	radio_setup(&Serial1, PA12, 115200);
+	radio_debug("SOEREN - Self On Earth Returning Experimental Navigator\n");
+	radio_debug("Radio check:\n");
+	radio_debug("\t115200 Baud.\n");
+	//radio_config_baud(9600);
+	//radio_debug("\t9600 Baud.\n");
+	//radio_config_baud(115200);
+	radio_debug("Radio check complete.\n");
 
-	pinMode(13, OUTPUT);
+	radio_debug("Initializing:\n");
+	radio_debug("\tRudder servos...");
+	rudders_setup();
+	radio_debug(" done.\n");
 
-	//Servos
-	s1.attach(PA0);
-	s2.attach(PA1);
-	s3.attach(PA2);
-	s4.attach(PA3);
-	s5.attach(PA6);
+	radio_debug("\tGPS...");
+	gps_setup();
+	radio_debug(" done.\n");
 
-	s1.write(90);
-	s2.write(90);
-	s3.write(90);
-	s4.write(90);
-	s5.write(90);
-	for (uint8_t cnt = 0; cnt < 5; cnt++) {
-		servos[cnt] = 90;
-	}
+	radio_debug("\tAtmospheric sensors...");
+	atmosphere_setup();
+	radio_debug(" done.\n");
 
-	// Temperature/Pressure
-	setup_pres_temp();
+	radio_debug("\tPower sensor...");
+	power_setup();
+	radio_debug(" done.\n");
 
-	// Voltage/Current
-	ina219.begin();
+	radio_debug("\tOrientation sensor...");
+	orientation_setup();
+	radio_debug(" done.\n");
 
-	// Flight data (Gyro/Accelerometer)
-	setup_9axis();
+	radio_debug("Initialization Complete.\n");
+
+	radio_debug("\n\"Look at you, soaring through the air without a care in the world. Like an eagle. PILOTING A BLIMP!\" - GLaDOS\n");
 
 	time = millis() + looplength;
 }
 
-void loop() {
-	readSerial1();
-	byte data;
-	while (Serial3.available()) {
-		data=Serial3.read();
-		gps.encode(data);
-		//Serial1.print((char) data);   
+void handle_packet(union packet * packet) {
+	switch (packet->tag) {
+		case PKT_CONTROL:
+			rudders_update(packet->control.control[0],
+			    packet->control.control[1],
+			    packet->control.control[2],
+			    packet->control.control[3],
+			    packet->control.control[4]);
+			break;
+		case PKT_REPORT: {
+			char info[256];
+			snprintf(info, 256, "REPORT{gyr=(%hu %hu %hu), acc=(%hu %hu %hu), mag=(%hu %hu %hu), temp=%f, pres=%hu, volt=%f, cur=%f}\n",
+			    flightcontrol_sensors.gyr[0], flightcontrol_sensors.gyr[1], flightcontrol_sensors.gyr[2],
+			    flightcontrol_sensors.acc[0], flightcontrol_sensors.acc[1], flightcontrol_sensors.acc[2],
+			    flightcontrol_sensors.mag[0], flightcontrol_sensors.mag[1], flightcontrol_sensors.mag[2],
+			    flightcontrol_sensors.temperature, flightcontrol_sensors.pressure,
+			    flightcontrol_sensors.voltage, flightcontrol_sensors.current);
+			radio_debug(info);
+		} break;
+		default:
+			break;
 	}
+}
 
-	if (millis() > time) {
-		//Hier passiert die Regelung irgendwann!
-		sendTelemetry();
-		time = time + looplength;
+void loop() {
+	static uint8_t tele_cnt = 0;
+
+	radio_update(&handle_packet);
+	gps_update();
+
+	if (millis() >= time) {
+		orientation_update();
+		telemetry_send_flight();
+
+		if (tele_cnt == 5 || tele_cnt == 10) {
+			telemetry_send_mag();
+		}
+
+		if (tele_cnt >= 16) {
+			atmosphere_update();
+			telemetry_send_atmosphere();
+			power_update();
+			telemetry_send_power();
+			gps_update();
+			telemetry_send_gps();
+			tele_cnt = 0;
+		}
+
+		tele_cnt++;
+		time += looplength;
 	}
 }
