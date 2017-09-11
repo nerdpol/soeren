@@ -1,0 +1,6 @@
+---
+BasedOnStyle: LLVM
+UseTab: Never
+IndentWidth: 2
+Language: Cpp
+AlignAfterOpenBracket: DontAlign

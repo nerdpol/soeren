@@ -1,29 +1,27 @@
 #include <TinyGPS++.h>
 
-TinyGPSPlus gps;
+struct {
+  TinyGPSPlus parser;
+  HardwareSerial * serial;
+} gps;
 
-void gps_setup() {
-	Serial3.begin(9600);
+void gps_setup(HardwareSerial * serial) {
+  gps.serial = serial;
+  gps.serial->begin(9600);
 }
 
-void gps_update() {
-	while (Serial3.available()) {
-		gps.encode(Serial3.read());
-	}
-	if (gps.location.isUpdated()) {
-		flightcontrol_sensors.latitude = gps.location.lat();
-		flightcontrol_sensors.longitude = gps.location.lng();
-	}
-	if (gps.altitude.isUpdated()) {
-		flightcontrol_sensors.altitude = (uint16_t)gps.altitude.meters();
-	}
-	if (gps.satellites.isUpdated()) {
-		flightcontrol_sensors.links = (uint8_t)gps.satellites.value();
-	}
-	if (gps.course.isUpdated()) {
-		flightcontrol_sensors.yaw = gps.course.deg();
-	}
-	if (gps.speed.isUpdated()) {
-		flightcontrol_sensors.velocity = gps.speed.mps();
-	}
+int gps_update() {
+  int ret = 0;
+  while (gps.serial->available()) {
+    if (gps.parser.encode(gps.serial->read())) {
+      flightcontrol_sensors.latitude = gps.parser.location.lat();
+      flightcontrol_sensors.longitude = gps.parser.location.lng();
+      flightcontrol_sensors.altitude = (uint16_t)gps.parser.altitude.meters();
+      flightcontrol_sensors.links = (uint8_t)gps.parser.satellites.value();
+      flightcontrol_sensors.yaw = gps.parser.course.deg();
+      flightcontrol_sensors.velocity = gps.parser.speed.mps();
+      ret = 1;
+    }
+  }
+  return ret;
 }
