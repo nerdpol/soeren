@@ -82,7 +82,7 @@ void setup() {
   Serial.println("Starte setup");
   mpu_init();
 
-  //calMagSensor();
+  calMagSensor();
 }
 
 
