@@ -65,7 +65,7 @@ typedef struct {
 flightcontrol_sensors_t flightcontrol_sensors;
 
 unsigned long time;
-
+  int32_t mag_bias[3] = {0, 0, 0}, mag_scale[3] = {0, 0, 0};
 void setup() {
   radio_setup(&Serial, PA12, 115200);
   radio_configure_baud(115200);
@@ -114,9 +114,17 @@ void loop() {
 
     // Calculate the magnetometer values in milliGauss
     // Include factory calibration per data sheet and user environmental corrections
+    /*
     mx = (float)magCount[0] * mRes * magCalibration[0] - magbias[0]; // get actual magnetometer value, this depends on scale being set
     my = (float)magCount[1] * mRes * magCalibration[1] - magbias[1];
     mz = (float)magCount[2] * mRes * magCalibration[2] - magbias[2];
+*/
+  //Franz routines
+    mx = (float)(magCount[0]-mag_bias[0]) * mRes * magCalibration[0];
+    my = (float)(magCount[1]-mag_bias[1]) * mRes * magCalibration[1];
+    mz = (float)(magCount[2]-mag_bias[2]) * mRes * magCalibration[2];
+
+    
   }
   Now = micros();
   deltat = ((Now - lastUpdate) / 1000000.0f); // set integration time by time elapsed since last filter update
@@ -161,7 +169,7 @@ void loop() {
 
 void calMagSensor()
 {
-  int32_t mag_bias[3] = {0, 0, 0}, mag_scale[3] = {0, 0, 0};
+
   int16_t mag_max[3] = { -32767, -32767, -32767}, mag_min[3] = {32767, 32767, 32767}, mag_temp[3] = {0, 0, 0};
 
 
