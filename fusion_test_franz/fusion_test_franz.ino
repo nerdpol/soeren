@@ -65,7 +65,7 @@ typedef struct {
 flightcontrol_sensors_t flightcontrol_sensors;
 
 unsigned long time;
-  int32_t mag_bias[3] = {0, 0, 0}, mag_scale[3] = {0, 0, 0};
+int16_t mag_bias[3] = {0, 0, 0}, mag_scale[3] = {0, 0, 0};
 void setup() {
   radio_setup(&Serial, PA12, 115200);
   radio_configure_baud(115200);
@@ -82,7 +82,12 @@ void setup() {
   Serial.println("Starte setup");
   mpu_init();
 
-  calMagSensor();
+
+  getMres();
+  Serial.print("Mres:");
+  Serial.println(mRes);
+
+  //calMagSensor();
 }
 
 
@@ -108,23 +113,36 @@ void loop() {
 
     readMagData(magCount);  // Read the x/y/z adc values
     getMres();
-    magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
-    magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
-    magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
+    //    magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
+    //    magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
+    //    magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
 
     // Calculate the magnetometer values in milliGauss
     // Include factory calibration per data sheet and user environmental corrections
     /*
-    mx = (float)magCount[0] * mRes * magCalibration[0] - magbias[0]; // get actual magnetometer value, this depends on scale being set
-    my = (float)magCount[1] * mRes * magCalibration[1] - magbias[1];
-    mz = (float)magCount[2] * mRes * magCalibration[2] - magbias[2];
-*/
-  //Franz routines
-    mx = (float)(magCount[0]-mag_bias[0]) * mRes * magCalibration[0];
-    my = (float)(magCount[1]-mag_bias[1]) * mRes * magCalibration[1];
-    mz = (float)(magCount[2]-mag_bias[2]) * mRes * magCalibration[2];
+      mx = (float)magCount[0] * mRes * magCalibration[0] - magbias[0]; // get actual magnetometer value, this depends on scale being set
+      my = (float)magCount[1] * mRes * magCalibration[1] - magbias[1];
+      mz = (float)magCount[2] * mRes * magCalibration[2] - magbias[2];
 
-    
+    */
+
+    //Franz routines
+//    mag_bias[0] = -29;
+//    mag_bias[0] = 158;
+//    mag_bias[0] = -164;
+
+//    Serial.print( (int)magCount[0] );
+//    Serial.print(","); Serial.print( (int)magCount[1]  );
+//    Serial.print(","); Serial.print( (int)magCount[2]  ); Serial.print("->");
+//    Serial.print( (int)(magCount[0] - mag_bias[0]) );
+//    Serial.print(","); Serial.print( (int)(magCount[1] - mag_bias[1])  );
+//    Serial.print(","); Serial.print( (int)(magCount[2] - mag_bias[2])  ); Serial.println(" :)");
+
+    mx = (float)(magCount[0] - mag_bias[0]) * mRes * magCalibration[0];
+    my = (float)(magCount[1] - mag_bias[1]) * mRes * magCalibration[1];
+    mz = (float)(magCount[2] - mag_bias[2]) * mRes * magCalibration[2];
+
+
   }
   Now = micros();
   deltat = ((Now - lastUpdate) / 1000000.0f); // set integration time by time elapsed since last filter update
@@ -150,7 +168,7 @@ void loop() {
   yaw   *= 180.0f / PI;
   yaw   -= 3; // Angeblich fuer Muenchen
   roll  *= 180.0f / PI;
-
+  float heading = atan2(my, mx);
 
   Serial.print("Yaw, Pitch, Roll: ");
   Serial.print(yaw, 2);
@@ -158,9 +176,12 @@ void loop() {
   Serial.print(pitch, 2);
   Serial.print(", ");
   Serial.print(roll, 2);
+  Serial.print(",-> ");
+  Serial.print(heading, 2);
   Serial.print("mx = "); Serial.print( (int)mx );
   Serial.print(" my = "); Serial.print( (int)my );
   Serial.print(" mz = "); Serial.print( (int)mz ); Serial.print(" mG ");
+  
   Serial.print(" rate = "); Serial.print((float)sumCount / sum, 2); Serial.println(" Hz");
 
 
@@ -177,9 +198,6 @@ void calMagSensor()
   delay(2000);
   Serial.println("gooooo");
 
-  //magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
-  //magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
-  //magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
 
   getMres();
   for (uint16_t cnt = 0; cnt < 1000; cnt++) {
@@ -193,7 +211,7 @@ void calMagSensor()
     Serial.print("mx = "); Serial.print( (int)magCount[0] );
     Serial.print(" my = "); Serial.print( (int)magCount[1]  );
     Serial.print(" mz = "); Serial.print( (int)magCount[2]  ); Serial.println(" Count");
-    delay(20);
+    delay(100);
 
   }
   Serial.println("Cal Finsiehd");
@@ -201,7 +219,7 @@ void calMagSensor()
   mag_bias[0]  = (mag_max[0] + mag_min[0]) / 2; // get average x mag bias in counts
   mag_bias[1]  = (mag_max[1] + mag_min[1]) / 2; // get average y mag bias in counts
   mag_bias[2]  = (mag_max[2] + mag_min[2]) / 2; // get average z mag bias in counts
-  
+
   Serial.print("mx_max,min = "); Serial.print( (int)mag_max[0]);  Serial.print(" "); Serial.print( (int)mag_min[0]);
   Serial.print("my_max,min = "); Serial.print( (int)mag_max[1]);  Serial.print(" "); Serial.print( (int)mag_min[1]);
   Serial.print("mz_max,min = "); Serial.print( (int)mag_max[2]);  Serial.print(" "); Serial.println( (int)mag_min[2]);
@@ -210,13 +228,13 @@ void calMagSensor()
   Serial.print(" my_bias = "); Serial.print( (int)mag_bias[1] );
   Serial.print(" mz_bias = "); Serial.println( (int)mag_bias[2] );
 
-  magbias[0] = (float)mag_bias[0] * mRes * magCalibration[0];
-  magbias[1] = (float)mag_bias[1] * mRes * magCalibration[1];
-  magbias[2] = (float)mag_bias[2] * mRes * magCalibration[2];
-  
+  //  magbias[0] = (float)mag_bias[0] * mRes * magCalibration[0];
+  //  magbias[1] = (float)mag_bias[1] * mRes * magCalibration[1];
+  //  magbias[2] = (float)mag_bias[2] * mRes * magCalibration[2];
+
   Serial.print("mx_magbias = "); Serial.print( magbias[0] );
   Serial.print(" my_magbias = "); Serial.print( magbias[1] );
-  Serial.print(" mz_magbias = "); Serial.print( magbias[2] );Serial.println("mG");
+  Serial.print(" mz_magbias = "); Serial.print( magbias[2] ); Serial.println("Conts");
   delay(5000);
 
 }
