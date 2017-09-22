@@ -3,7 +3,7 @@
 // Updates should (hopefully) always be available at https://github.com/jrowberg/i2cdevlib
 //
 // Changelog:
-//      2013-05-08 - added seamless Fastwire support
+//      2013-05d-08 - added seamless Fastwire support
 //                 - added note about gyro calibration
 //      2012-06-21 - added note about Arduino 1.0.1 + Leonardo compatibility error
 //      2012-06-20 - improved FIFO overflow handling and simplified read process
