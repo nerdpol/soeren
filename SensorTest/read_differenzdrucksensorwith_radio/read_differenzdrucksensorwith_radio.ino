@@ -39,21 +39,16 @@
       MOSI2   B15 (MOSI2)
       CS      A15
       INT     B5
-      Comment Franz: Fullscalerange ist +- 6V man sollte 5V an I2c anstecken!
 */
-#include <Adafruit_ADS1015.h>
-
-Adafruit_ADS1115 ads(0x48);
-float Voltage = 0.0;
 
 #include "includes.h"
 #include "radio_packet.h"
 #include <Wire.h>
 #define looplength 100
-
-#define pcf8574_adress 0x27
-
 unsigned int calibrationData[7];
+  uint32_t val;
+  int i;
+  int o;
 typedef struct {
   uint16_t pressure;
   uint16_t acc[3];
@@ -73,6 +68,10 @@ flightcontrol_sensors_t flightcontrol_sensors;
 
 unsigned long time;
 int16_t mag_bias[3] = {0, 0, 0}, mag_scale[3] = {0, 0, 0};
+
+int16_t run_av_fil[10];
+int16_t run_av_fil_count=1;
+
 void setup() {
   radio_setup(&Serial, PA12, 115200);
   radio_configure_baud(115200);
@@ -86,37 +85,33 @@ void setup() {
   radio_debug("Radio check complete.\n");
   delay(1000);
 
-  Serial.println("Starte setup");
-ads.begin();
-
+  Serial.println("Starte setup.... Read Analog");
+// Analogeingang für Staudrucksensor ist PA1 
+  pinMode(PA1, INPUT_ANALOG);
 }
 
 
 void loop() {
 
+run_av_fil[run_av_fil_count] = analogRead(PA1);    // read the input pin
+run_av_fil_count++;
+if(run_av_fil_count>=10)
+{
+  run_av_fil_count=0;
+}
+val=0;
+for(o=0;o<=9;o++)
+{
+val = val+run_av_fil[o];
+};
+val = val/10;
 
- int16_t adc0;  // we read from the ADC, we have a sixteen bit integer as a result
-
-  adc0 = ads.readADC_SingleEnded(0);
-  Voltage = (adc0 * 0.1875)/1000;
-  
-  Serial.print("AIN0: "); 
-  Serial.print(adc0);
-  Serial.print("\tVoltage: ");
-  Serial.println(Voltage, 7);  
-  Serial.println();
-
-  adc0 = ads.readADC_SingleEnded(1);
-  Voltage = (adc0 * 0.1875)/1000;
-  
-  Serial.print("AIN1: "); 
-  Serial.print(adc0);
-  Serial.print("\tVoltage: ");
-  Serial.println(Voltage, 7);  
-  Serial.println();
-  delay(1000);
-
-
+//for(i=1;i<=(val-2800)/100;i++)
+//{
+//  Serial.print('*');
+//};
+ Serial.println((val-2900));
+delay(100);
 
 }
 

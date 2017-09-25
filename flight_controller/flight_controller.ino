@@ -67,7 +67,7 @@ unsigned long time;
 void setup() {
   radio_setup(&Serial, PA12, 115200);
   radio_configure_baud(115200);
-  radio_configure_channel(4);
+  radio_configure_channel(5);
   radio_debug("SOEREN - Self On Earth Returning Experimental Navigator\n");
   radio_debug("Radio check:\n");
   radio_debug("\t115200 Baud.\n");

@@ -87,6 +87,7 @@ void setup() {
   delay(1000);
 
   Serial.println("Starte setup");
+
 ads.begin();
 
 }
@@ -105,7 +106,7 @@ void loop() {
   Serial.print("\tVoltage: ");
   Serial.println(Voltage, 7);  
   Serial.println();
-
+ delay(1000);
   adc0 = ads.readADC_SingleEnded(1);
   Voltage = (adc0 * 0.1875)/1000;
   
@@ -114,10 +115,38 @@ void loop() {
   Serial.print("\tVoltage: ");
   Serial.println(Voltage, 7);  
   Serial.println();
+   delay(1000);
+ adc0 = ads.readADC_SingleEnded(2);
+  Voltage = (adc0 * 0.1875)/1000;
+   Serial.print("AIN2: "); 
+  Serial.print(adc0);
+  Serial.print("\tVoltage: ");
+  Serial.println(Voltage, 7);  
+  Serial.println();
+   delay(1000);
+   adc0 = ads.readADC_SingleEnded(3);
+  Voltage = (adc0 * 0.1875)/1000;
+  Serial.print("AIN3: "); 
+  Serial.print(adc0);
+  Serial.print("\tVoltage: ");
+  Serial.println(Voltage, 7);  
+  Serial.println();
+  
   delay(1000);
+  Serial.println("All on ");
+  IOexpanderWrite(pcf8574_adress, 0xFF);
+  delay(10000);
+
+   Serial.println("All off ");
+ IOexpanderWrite(pcf8574_adress, 0x00);
 
 
-
+}
+void IOexpanderWrite(byte address, byte _data ) 
+{
+ Wire.beginTransmission(address);
+ Wire.write(_data);
+ Wire.endTransmission(); 
 }
 
 
