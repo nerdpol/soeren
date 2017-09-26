@@ -1,18 +1,16 @@
-#!/usr/bin/python
-
-# ZetCode PyGTK tutorial
-#
-# This code example draws a circle
-# using the cairo library
-#
-# author: jan bodnar
-# website: zetcode.com
-# last edited: February 2009
+#!/usr/bin/python3
 
 
-import gtk
+# Python3
+# GTK2 (rewrite to GTK3 possible)
+# see wiki for dependencies
+
+
+import gi
+gi.require_version('Gtk', '2.0')
+from gi.repository import Gtk as gtk
+from gi.repository import GObject as gobject
 import math
-import gobject
 
 
 FRAMERATE = 15
@@ -29,16 +27,25 @@ class PyApp(gtk.Window):
 
         self.set_title("Ground Station HUD")
         self.resize(430, 150)
-        self.set_position(gtk.WIN_POS_CENTER)
+        #self.set_position(gtk.WIN_POS_CENTER)
 
         self.connect("destroy", gtk.main_quit)
 
         darea = gtk.DrawingArea()
+
+        # gtk3
+        #darea.connect("draw", self.render)
+        # gtk2
         darea.connect("expose-event", self.render)
+
         self.add(darea)
 
         self.show_all()
 
+        # gtk3
+        #self.w = self.get_allocation().width
+        #self.h = self.get_allocation().height
+        # gtk2
         self.w = self.allocation.width
         self.h = self.allocation.height
 
@@ -75,11 +82,16 @@ class PyApp(gtk.Window):
     def render(self, widget, event):
         self.x+=1
 
+
         # save (for resizing)
+        # gtk3
+        #self.w = self.get_allocation().width
+        #self.h = self.get_allocation().height
+        # gtk2
         self.w = self.allocation.width
         self.h = self.allocation.height
 
-        print "render"
+        print("render")
 
         # drawing context
         cr = widget.window.cairo_create()
@@ -154,26 +166,26 @@ class PyApp(gtk.Window):
         cr.stroke()
         #cr.fill()
 
-        print xyz
+        print(xyz)
 
     def Quaternion_toEulerianAngle(self, x, y, z, w):
-	ysqr = y*y
+        ysqr = y*y
 
-	t0 = +2.0 * (w * x + y*z)
-	t1 = +1.0 - 2.0 * (x*x + ysqr)
-	X = math.degrees(math.atan2(t0, t1))
+        t0 = +2.0 * (w * x + y*z)
+        t1 = +1.0 - 2.0 * (x*x + ysqr)
+        X = math.degrees(math.atan2(t0, t1))
 
-	t2 = +2.0 * (w*y - z*x)
-	t2 =  1 if t2 > 1 else t2
-	t2 = -1 if t2 < -1 else t2
-	Y = math.degrees(math.asin(t2))
+        t2 = +2.0 * (w*y - z*x)
+        t2 =  1 if t2 > 1 else t2
+        t2 = -1 if t2 < -1 else t2
+        Y = math.degrees(math.asin(t2))
 
-	t3 = +2.0 * (w * z + x*y)
-	t4 = +1.0 - 2.0 * (ysqr + z*z)
-	Z = math.degrees(math.atan2(t3, t4))
+        t3 = +2.0 * (w * z + x*y)
+        t4 = +1.0 - 2.0 * (ysqr + z*z)
+        Z = math.degrees(math.atan2(t3, t4))
 
 
-	return (X, Y, Z)
+        return (X, Y, Z)
 
 
 app = PyApp()
