@@ -14,6 +14,10 @@ import gtk
 import math
 import gobject
 
+
+FRAMERATE = 15
+
+
 class PyApp(gtk.Window):
 
 
@@ -30,7 +34,7 @@ class PyApp(gtk.Window):
         self.connect("destroy", gtk.main_quit)
 
         darea = gtk.DrawingArea()
-        darea.connect("expose-event", self.expose)
+        darea.connect("expose-event", self.render)
         self.add(darea)
 
         self.show_all()
@@ -38,44 +42,118 @@ class PyApp(gtk.Window):
         self.w = self.allocation.width
         self.h = self.allocation.height
 
-        # fire up timer (60fps)
+        # fire up timer
         self.timer_next()
 
+    def timer_next(self):
+        self.queue_draw()
+        gobject.timeout_add(1000/FRAMERATE, self.timer_next)
 
-    def expose(self, widget, event):
+    # split visible frame into 4 rectangles
+    def drawOutlines(self, cr):
+        cr.set_line_width(3)
+        cr.set_source_rgb(0.5, 0.5, 0.5)
+        cr.rectangle(0, 0, self.w/2, self.h/2)
+        cr.stroke_preserve()
+        cr.rectangle(self.w/2, 0, self.w/2, self.h/2)
+        cr.stroke_preserve()
+        cr.rectangle(0, self.h/2, self.w/2, self.h/2)
+        cr.stroke_preserve()
+        cr.rectangle(self.w/2, self.h/2, self.w/2, self.h/2)
+        cr.stroke_preserve()
+
+    def drawExampleCircle(self, cr):
+        cr.set_line_width(9)
+        cr.set_source_rgb(0.7, 0.2, 0.0)
+        cr.translate(self.w/3, self.h/3)
+        cr.arc(0, 0, self.x % 50, 0, 2*math.pi)
+        cr.stroke_preserve()
+        cr.set_source_rgb(0.3, 0.4, 0.6)
+        cr.fill()
+
+
+    def render(self, widget, event):
         self.x+=1
 
-        # resize
+        # save (for resizing)
         self.w = self.allocation.width
         self.h = self.allocation.height
 
         print "render"
+
+        # drawing context
         cr = widget.window.cairo_create()
 
-        cr.set_line_width(9)
-        cr.set_source_rgb(0.7, 0.2, 0.0)
+        # draw example circle
+        cr.save()
+        self.drawExampleCircle(cr);
+        cr.restore()
 
-        cr.translate(self.w/3, self.h/3)
-        cr.arc(0, 0, self.x % 50, 0, 2*math.pi)
-        cr.stroke_preserve()
-
-        cr.set_source_rgb(0.3, 0.4, 0.6)
-        cr.fill()
+        cr.save()
         self.draw_artificial_horizon((1, 0, 0, 0), cr)
+        cr.restore()
 
-    def timer_next(self):
-        self.queue_draw()
-        gobject.timeout_add(16, self.timer_next)
+        cr.save()
+        self.drawOutlines(cr)
+        cr.restore()
+
 
     # q: quaternion (x, y, z, w)
     def draw_artificial_horizon(self, q, cr):
+
         xyz = self.Quaternion_toEulerianAngle(q[0], q[1], q[2], q[3])
-        cr.set_line_width(5)
+
+        # x - roll
+        # y - pitch
+        # z - yaw
+
+        # circle equation
+        # x^2 + y^2 = r^2
+        # idea: mask the sky circle area
+        #       and draw the half earth circle anyway
+        # -> no need to do this:
+        #    just calc the 2 points and the start and end angle
+
+        mWidth = self.w/2
+        mHeight = self.h/2
+        radius = min(mHeight/3, mWidth/3)
+
+        cr.set_line_width(3)
         cr.set_source_rgb(0.7, 0.2, 0.0)
-        cr.translate(self.w/4, self.h/4)
-        cr.arc(0, 0, 40, 0, 2*math.pi)
+        cr.translate(0, 0)
+
+        # outer circle (sky)
+        cr.arc(mWidth/2, mHeight/2, radius, 0, 2*math.pi)
         cr.stroke_preserve()
+        cr.set_source_rgb(0.2, 0.6, 0.85)
         cr.fill()
+
+        # inner circle (earth, green)
+        cr.set_source_rgb(0.3, 0.6, 0.1)
+        # test
+        #cr.arc(mWidth/2, mHeight/2, radius, math.sin((xyz[0]*math.pi/360)), math.sin((math.pi*xyz[0]/360) - math.pi))
+        cr.arc(mWidth/2, mHeight/2, radius, math.pi/4, (math.pi/2) + 1)
+        cr.fill()
+
+        # inner cross
+        #cr.translate((mWidth/4) - radius, mHeight/4)
+        cr.set_line_width(4)
+        cr.set_source_rgb(0, 0, 0)
+
+        # TODO horizontal line
+        # calc the anchor points on the circle
+        # -> x - roll
+        cr.move_to((mWidth/2) - radius*.7, mHeight/2)
+        cr.line_to((mWidth/2) + radius*.7, mHeight/2)
+        cr.stroke()
+
+        # TODO vertical line
+        # -> y - pitch
+        cr.move_to(mWidth/2, (mHeight/2) + radius/2)
+        cr.line_to(mWidth/2, (mHeight/2) - radius/2)
+        cr.stroke()
+        #cr.fill()
+
         print xyz
 
     def Quaternion_toEulerianAngle(self, x, y, z, w):
