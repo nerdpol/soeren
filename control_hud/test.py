@@ -1,24 +1,12 @@
 #!/usr/bin/python3
 
 
+###
+# INFO
+###
 # Python3
 # GTK2 (rewrite to GTK3 possible)
 # see wiki for dependencies
-
-
-import gi
-gi.require_version('Gtk', '2.0')
-from gi.repository import Gtk as gtk
-from gi.repository import GObject as gobject
-import threading
-import cairo
-import math
-import serial
-from time import sleep
-
-
-FRAMERATE = 5
-
 
 ###
 # TODO
@@ -27,19 +15,53 @@ FRAMERATE = 5
 # - Weiße Linien sind fix (um die Mitte)
 
 
+import argparse
+import sys
+import gi
+import threading
+import cairo
+import math
+import serial
+from time import sleep
+gi.require_version('Gtk', '2.0')
+from gi.repository import Gtk as gtk
+from gi.repository import GObject as gobject
+
+# local file
+import helper as h
 
 
+# flags
+useSerial = False
+serialport = "/dev/ttyUSB3"
+serialbaud = 115200
+framerate = 5
 
+
+# parse commandline arguments
+parser = argparse.ArgumentParser(description='Control HUD GUI')
+parser.add_argument('--mode', type=str, help='Either "demo" or "serial"')
+parser.add_argument('--serialport', type=str, help='serial port, defaults to ' + serialport)
+parser.add_argument('--serialbaud', type=str, help='serial baud rate, defaults to ' + str(serialbaud))
+parser.add_argument('--fps', type=str, help='Set the number of rendered frames per second')
+args = parser.parse_args()
+if args.mode == "serial":
+	useSerial = True
+if args.fps:
+	framerate = args.fps
+if args.serialport:
+	serialport = args.serialport
+if args.serialbaud:
+	serialbaud = args.serialbaud
 
 
 class PyApp(gtk.Window):
 
-
-
     def __init__(self):
         super(PyApp, self).__init__()
 
-        self.sensorQuaternion = [-1, -1, -1, -1]
+        # where sensor data gets saved
+        self.sensorQuaternion = [-1, 0, 0, 0]
 
         # runner variables
         self.qe1 = 1
@@ -74,7 +96,7 @@ class PyApp(gtk.Window):
 
         # reale sensordaten
         # w, x, y, z
-
+        # TODO needed format: xyzw
         self.realExampleQuats = [
             # aufrecht
             [0.85, 0.14, 0.0, -0.51, "aufrecht"],
@@ -91,48 +113,36 @@ class PyApp(gtk.Window):
         ]
         self.numRealExampleQuats = len(self.realExampleQuats)
 
-        # store example quaternions
-        # format xyzw
-        """
-        self.exampleQuats = [
-                # facing the sky, slightly rotated to the left
-                [-0.346, 0.035, 0.094, 0.933],
-                # ?
-                [0.373, -0.106, 0.195, 0.901],
-                # upside down
-                [0, 0, 0.989, 0.142],
-                # ?
-                [-0.346, 0.035, 0.094, 0.933],
-                # earth should be barely visible
-                [-0.145, -0.315, 0.393, 0.852]
-        ]
-        self.numExampleQuats = len(self.exampleQuats)
-        """
-
         # fire up timer
         self.timer_next()
 
+        # create a lock for self.sensorQuaternion
         self.lock = threading.Lock()
 
-        # thread
-        t = threading.Thread(None, self.read_serial)
-        t.start()
+        # read quaternions concurrently
+        if useSerial:
+        	t = threading.Thread(None, self.read_serial)
+        	t.start()
 
+    # blocking call
+    # always read from the serial port and store the quaternion to self.sensorQuaternion
+    # TODO xyzw vs wxyz??
     def read_serial(self):
-        ser = serial.Serial("/dev/ttyUSB3", baudrate=115200)
-        while True:
-            byts = ser.readline()
-            with self.lock:
-                try:
+        try:
+            ser = serial.Serial(serialport, baudrate=serialbaud)
+            while True:
+                byts = ser.readline()
+                with self.lock:
                     self.sensorQuaternion = eval(byts)
                     self.sensorQuaternion[0], self.sensorQuaternion[4] = self.sensorQuaternion[4], self.sensorQuaternion[0]
-                except:
-                    pass
-                print("Last sensor val: ", self.sensorQuaternion)
+                    print("Last sensor val: ", self.sensorQuaternion)
+        except serial.serialutil.SerialException as e:
+            print("Error while using serialport: ", e)
+            sys.exit(-1)
 
     def timer_next(self):
         self.queue_draw()
-        gobject.timeout_add(1000/FRAMERATE, self.timer_next)
+        gobject.timeout_add(1000/framerate, self.timer_next)
 
     # split visible frame into 4 rectangles
     def drawOutlines(self, cr):
@@ -147,16 +157,6 @@ class PyApp(gtk.Window):
         cr.rectangle(self.w/2, self.h/2, self.w/2, self.h/2)
         cr.stroke_preserve()
 
-    def drawExampleCircle(self, cr):
-        cr.set_line_width(9)
-        cr.set_source_rgb(0.7, 0.2, 0.0)
-        cr.translate(3*self.w/4, self.h/4)
-        cr.arc(0, 0, self.x % 50, 0, 2*math.pi)
-        cr.stroke_preserve()
-        cr.set_source_rgb(0.3, 0.4, 0.6)
-        cr.fill()
-
-
     def render(self, widget, event):
         self.x+=1
 
@@ -169,24 +169,16 @@ class PyApp(gtk.Window):
         self.w = self.allocation.width
         self.h = self.allocation.height
 
-        #print("render")
-
         # drawing context
         cr = widget.window.cairo_create()
 
-        # draw example circle
         cr.save()
-        self.drawExampleCircle(cr)
-        cr.restore()
-
-        cr.save()
-        #self.draw_artificial_horizon((1, 0, 0, 0), cr)
-        #self.draw_artificial_horizon(self.exampleQuats[self.x%self.numExampleQuats], cr)
-        #self.draw_artificial_horizon(self.realExampleQuats[self.x%self.numRealExampleQuats], cr)
-        #self.draw_artificial_horizon(self.getNextSampleQuaternion(), cr)
-        with self.lock:
-            q = self.sensorQuaternion
-        self.draw_artificial_horizon(q, cr)
+        if useSerial:
+            with self.lock:
+                q = self.sensorQuaternion
+            self.draw_artificial_horizon(q, cr)
+        else:
+            self.draw_artificial_horizon(self.realExampleQuats[self.x%self.numRealExampleQuats], cr)
         cr.restore()
 
         cr.save()
@@ -197,7 +189,7 @@ class PyApp(gtk.Window):
     # q: quaternion (x, y, z, w)
     def draw_artificial_horizon(self, q, cr):
 
-        xyz = self.Quaternion_toEulerianAngle(q)
+        xyz = h.Quaternion_toEulerianAngle(q)
         x_deg = xyz[0]
         y_deg = xyz[1]
         z_deg = xyz[2]
@@ -235,7 +227,7 @@ class PyApp(gtk.Window):
         # upsideDown stuff is kind of wonky...
         # valueMap is not really fixed?
         isUpsideDown = False
-        w = self.valueMap(pitch, -math.pi, math.pi, -2*radius, 2*radius)
+        w = h.valueMap(pitch, -math.pi, math.pi, -2*radius, 2*radius)
         #if pitch >= math.pi/2 and pitch <= 3*(math.pi/2):
         #    print("Upside down!")
         #    w = -w
@@ -341,10 +333,10 @@ class PyApp(gtk.Window):
             p1y = m*indicatorGap
             p2x =  indicatorMaxLen/4 if n%2 == 0 else (o)*( indicatorMaxLen/4)
             p2y = m*indicatorGap
-            pAx, pAy = self.rotate2D(p1x, p1y, alpha)
-            pBx, pBy = self.rotate2D(p2x, p2y, alpha)
-            pCx, pCy = self.rotate2D(pAx, pAy, math.pi)
-            pDx, pDy = self.rotate2D(pBx, pBy, math.pi)
+            pAx, pAy = h.rotate2D(p1x, p1y, alpha)
+            pBx, pBy = h.rotate2D(p2x, p2y, alpha)
+            pCx, pCy = h.rotate2D(pAx, pAy, math.pi)
+            pDx, pDy = h.rotate2D(pBx, pBy, math.pi)
             # draw
             cr.move_to(pAx, pAy)
             cr.line_to(pBx, pBy)
@@ -361,77 +353,20 @@ class PyApp(gtk.Window):
         return
 
 
-
-    # return Eulerian Angles in
-    #  !Degrees!
-    def Quaternion_toEulerianAngle(self, xyzw):
-        x = xyzw[0]
-        y = xyzw[1]
-        z = xyzw[2]
-        w = xyzw[3]
-
-        ysqr = y*y
-
-        t0 = +2.0 * (w * x + y*z)
-        t1 = +1.0 - 2.0 * (x*x + ysqr)
-        X = math.degrees(math.atan2(t0, t1))
-
-        t2 = +2.0 * (w*y - z*x)
-        t2 =  1 if t2 > 1 else t2
-        t2 = -1 if t2 < -1 else t2
-        Y = math.degrees(math.asin(t2))
-
-        t3 = +2.0 * (w * z + x*y)
-        t4 = +1.0 - 2.0 * (ysqr + z*z)
-        Z = math.degrees(math.atan2(t3, t4))
-
-        return (X, Y, Z)
-
-
-    # return (x, y, z, w)
-    def Euler_toQuaternion(self, roll, pitch, yaw):
-        cy = math.cos(yaw * 0.5)
-        sy = math.sin(yaw * 0.5)
-        cr = math.cos(roll * 0.5)
-        sr = math.sin(roll * 0.5)
-        cp = math.cos(pitch * 0.5)
-        sp = math.sin(pitch * 0.5)
-        w = cy * cr * cp + sy * sr * sp
-        x = cy * sr * cp - sy * cr * sp
-        y = cy * cr * sp + sy * sr * cp
-        z = sy * cr * cp - cy * sr * sp
-        return (x, y, z, w)
-
-
-
-    def valueMap(self, x, in_min, in_max, out_min, out_max):
-        return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
-
-
-    # returns rotated x, y
-    def rotate2D(self, x, y, alpha):
-        # rotation matrix
-        tempSin = math.sin(alpha)
-        tempCos = math.cos(alpha)
-        r11 = tempCos
-        r12 = -tempSin
-        r21 = tempSin
-        r22 = tempCos
-        return (r11*x + r12*y, r21*x + r22*y)
-
     # returns a tuple (x, y, z, w)
     def getNextSampleQuaternion(self):
         self.qe1 += 0.05
         self.qe2 += 0.03
         self.qe3 += 0.07
-        #return self.Euler_toQuaternion(math.sin(self.qe1)*math.pi, math.cos(self.qe2)*math.pi, math.sin(self.qe3))
+        #return h.Euler_toQuaternion(math.sin(self.qe1)*math.pi, math.cos(self.qe2)*math.pi, math.sin(self.qe3))
         roll = -math.sin(self.qe1)*(math.pi/2)
         pitch = math.sin(self.qe2)*(math.pi/2)
         yaw = math.sin(self.qe3)
 
 
         print("Input getNext... ", roll, pitch, yaw)
-        return self.Euler_toQuaternion(roll, pitch, yaw)
+        return h.Euler_toQuaternion(roll, pitch, yaw)
 
-app = PyApp()
-gtk.main()
+if __name__ == "__main__":
+    app = PyApp()
+    gtk.main()
