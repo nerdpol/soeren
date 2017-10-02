@@ -10,11 +10,26 @@ import gi
 gi.require_version('Gtk', '2.0')
 from gi.repository import Gtk as gtk
 from gi.repository import GObject as gobject
+import threading
 import cairo
 import math
+import serial
+from time import sleep
 
 
-FRAMERATE = 30
+FRAMERATE = 5
+
+
+###
+# TODO
+###
+# - Gradindikator außen um künstlichen Horizont
+# - Weiße Linien sind fix (um die Mitte)
+
+
+
+
+
 
 
 class PyApp(gtk.Window):
@@ -23,6 +38,8 @@ class PyApp(gtk.Window):
 
     def __init__(self):
         super(PyApp, self).__init__()
+
+        self.sensorQuaternion = [-1, -1, -1, -1]
 
         # runner variables
         self.qe1 = 1
@@ -54,8 +71,29 @@ class PyApp(gtk.Window):
         self.w = self.allocation.width
         self.h = self.allocation.height
 
+
+        # reale sensordaten
+        # w, x, y, z
+
+        self.realExampleQuats = [
+            # aufrecht
+            [0.85, 0.14, 0.0, -0.51, "aufrecht"],
+            [0.35, 0.03, -0.03, -0.94, "aufrecht"],
+
+            # 45 ° x achse
+            [0.38, 0.13, -0.32, -0.86, "45° x axis"],
+
+            # 90 ° entlang y achse
+            [0.2, -0.63, -0.2, -0.73, "90° y axis"],
+
+            # 45 ° nach unten
+            [0.77, 0.2, 0.24, -0.57, "45° bottom view"]
+        ]
+        self.numRealExampleQuats = len(self.realExampleQuats)
+
         # store example quaternions
         # format xyzw
+        """
         self.exampleQuats = [
                 # facing the sky, slightly rotated to the left
                 [-0.346, 0.035, 0.094, 0.933],
@@ -69,9 +107,28 @@ class PyApp(gtk.Window):
                 [-0.145, -0.315, 0.393, 0.852]
         ]
         self.numExampleQuats = len(self.exampleQuats)
+        """
 
         # fire up timer
         self.timer_next()
+
+        self.lock = threading.Lock()
+
+        # thread
+        t = threading.Thread(None, self.read_serial)
+        t.start()
+
+    def read_serial(self):
+        ser = serial.Serial("/dev/ttyUSB3", baudrate=115200)
+        while True:
+            byts = ser.readline()
+            with self.lock:
+                try:
+                    self.sensorQuaternion = eval(byts)
+                    self.sensorQuaternion[0], self.sensorQuaternion[4] = self.sensorQuaternion[4], self.sensorQuaternion[0]
+                except:
+                    pass
+                print("Last sensor val: ", self.sensorQuaternion)
 
     def timer_next(self):
         self.queue_draw()
@@ -112,7 +169,7 @@ class PyApp(gtk.Window):
         self.w = self.allocation.width
         self.h = self.allocation.height
 
-        print("render")
+        #print("render")
 
         # drawing context
         cr = widget.window.cairo_create()
@@ -125,7 +182,11 @@ class PyApp(gtk.Window):
         cr.save()
         #self.draw_artificial_horizon((1, 0, 0, 0), cr)
         #self.draw_artificial_horizon(self.exampleQuats[self.x%self.numExampleQuats], cr)
-        self.draw_artificial_horizon(self.getNextSampleQuaternion(), cr)
+        #self.draw_artificial_horizon(self.realExampleQuats[self.x%self.numRealExampleQuats], cr)
+        #self.draw_artificial_horizon(self.getNextSampleQuaternion(), cr)
+        with self.lock:
+            q = self.sensorQuaternion
+        self.draw_artificial_horizon(q, cr)
         cr.restore()
 
         cr.save()
@@ -140,15 +201,20 @@ class PyApp(gtk.Window):
         x_deg = xyz[0]
         y_deg = xyz[1]
         z_deg = xyz[2]
-        roll = math.radians(x_deg)
+        yaw = math.radians(x_deg)
         pitch = math.radians(y_deg)
-        yaw = math.radians(z_deg)
+        roll = math.radians(z_deg)
 
         # x - roll
         # y - pitch
         # z - yaw
         # really?
 
+        print()
+        print()
+        # also print an info string if present
+        if len(q) == 5:
+            print("Info: ", q[4])
         print("Quaternion:      ", q)
         print("Euler (°):       ", xyz)
         print("Euler RPY (Rad): ", (roll, pitch, yaw))
@@ -170,10 +236,10 @@ class PyApp(gtk.Window):
         # valueMap is not really fixed?
         isUpsideDown = False
         w = self.valueMap(pitch, -math.pi, math.pi, -2*radius, 2*radius)
-        if pitch >= math.pi/2 and pitch <= 3*(math.pi/2):
-            print("Upside down!")
-            w = -w
-            isUpsideDown = True
+        #if pitch >= math.pi/2 and pitch <= 3*(math.pi/2):
+        #    print("Upside down!")
+        #    w = -w
+        #    isUpsideDown = True
 
         xc = mWidth/2
         yc = mHeight/2
