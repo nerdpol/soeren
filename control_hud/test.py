@@ -35,7 +35,8 @@ import helper as h
 useSerial = False
 serialport = "/dev/ttyUSB3"
 serialbaud = 115200
-framerate = 5
+framerate = 1
+RADIUS_DIVIDER = 3.2
 
 
 # parse commandline arguments
@@ -61,7 +62,10 @@ class PyApp(gtk.Window):
         super(PyApp, self).__init__()
 
         # where sensor data gets saved
+        # these should be changed by a separate thread
+        # via lock
         self.sensorQuaternion = [-1, 0, 0, 0]
+        self.speed = 0
 
         # runner variables
         self.qe1 = 1
@@ -70,7 +74,7 @@ class PyApp(gtk.Window):
         self.x = 1
 
         self.set_title("Ground Station HUD")
-        self.resize(430, 150)
+        self.resize(830, 450)
         #self.set_position(gtk.WIN_POS_CENTER)
 
         self.connect("destroy", gtk.main_quit)
@@ -133,8 +137,11 @@ class PyApp(gtk.Window):
             while True:
                 byts = ser.readline()
                 with self.lock:
-                    self.sensorQuaternion = eval(byts)
-                    self.sensorQuaternion[0], self.sensorQuaternion[4] = self.sensorQuaternion[4], self.sensorQuaternion[0]
+                    sq = eval(byts)
+                    lastx = sq[0]
+                    sq.remove(0)
+                    sq.append(lastx)
+                    self.sensorQuaternion = sq
                     print("Last sensor val: ", self.sensorQuaternion)
         except serial.serialutil.SerialException as e:
             print("Error while using serialport: ", e)
@@ -172,13 +179,19 @@ class PyApp(gtk.Window):
         # drawing context
         cr = widget.window.cairo_create()
 
+        self.drawBackground(cr)
+
         cr.save()
         if useSerial:
             with self.lock:
                 q = self.sensorQuaternion
-            self.draw_artificial_horizon(q, cr)
+            self.drawArtificialHorizon(q, cr)
         else:
-            self.draw_artificial_horizon(self.realExampleQuats[self.x%self.numRealExampleQuats], cr)
+            self.drawArtificialHorizon(self.realExampleQuats[self.x%self.numRealExampleQuats], cr)
+        cr.restore()
+
+        cr.save()
+        self.drawSpeed(cr)
         cr.restore()
 
         cr.save()
@@ -187,7 +200,7 @@ class PyApp(gtk.Window):
 
 
     # q: quaternion (x, y, z, w)
-    def draw_artificial_horizon(self, q, cr):
+    def drawArtificialHorizon(self, q, cr):
 
         xyz = h.Quaternion_toEulerianAngle(q)
         x_deg = xyz[0]
@@ -214,7 +227,7 @@ class PyApp(gtk.Window):
 
         mWidth = self.w/2
         mHeight = self.h/2
-        radius = min(mHeight/math.e, mWidth/math.e)
+        radius = min(mHeight/RADIUS_DIVIDER, mWidth/RADIUS_DIVIDER)
 
         # calculate angles for drawing the earth
         # this has to be flipped? or changed?
@@ -249,6 +262,10 @@ class PyApp(gtk.Window):
         cr.set_source_rgb(0.627, 0.321, 0.176)
         cr.arc(xc, yc, radius+radius*0.2, 0, -math.pi)
         cr.fill()
+
+        # angle indicators
+        self.drawAngleIndicators(radius, xc, yc, cr)
+        
         # white gap
         cr.set_source_rgb(1, 1, 1)
         cr.arc(xc, yc, radius+radius*0.05, 0, 2*math.pi)
@@ -264,16 +281,13 @@ class PyApp(gtk.Window):
         cr.set_source_rgb(0.2, 0.6, 0.85)
         cr.fill()
 
-
         # inner circle (earth, brown)
         cr.set_source_rgb(0.627, 0.321, 0.176)
         cr.arc(mx, my, radius*3, earthStartAngle, earthEndAngle)
         cr.fill()
 
-
         # white lines
         self.drawAttitudeIndicator(radius=radius, alpha=earthEndAngle, mx=mx, my=my, cr=cr)
-
 
         # fixed cross indicator (stays at the same position)
         fixedRadius = radius/6
@@ -315,7 +329,7 @@ class PyApp(gtk.Window):
 
         # white attitude indicator
         # change those params:
-        indicators = 5
+        indicators = 7
         indicatorGap = radius/16 #px
         indicatorMaxLen = radius/6
         indicatorLineWidth = radius/32 #px
@@ -329,14 +343,20 @@ class PyApp(gtk.Window):
         m = 1
         o = 1
         for i in range(indicators):
-            p1x = -indicatorMaxLen/4 if n%2 == 0 else (o)*(-indicatorMaxLen/4)
+            p1x = -indicatorMaxLen/4 if n%2 == 0 else (o*0.3)*(-indicatorMaxLen/4)
             p1y = m*indicatorGap
-            p2x =  indicatorMaxLen/4 if n%2 == 0 else (o)*( indicatorMaxLen/4)
+            p2x =  indicatorMaxLen/4 if n%2 == 0 else (o*0.3)*( indicatorMaxLen/4)
             p2y = m*indicatorGap
-            pAx, pAy = h.rotate2D(p1x, p1y, alpha)
-            pBx, pBy = h.rotate2D(p2x, p2y, alpha)
+            pBx, pBy = p2x, p2y
+            pAx, pAy = p1x, p1y
             pCx, pCy = h.rotate2D(pAx, pAy, math.pi)
             pDx, pDy = h.rotate2D(pBx, pBy, math.pi)
+            """
+            pBx, pBy = h.rotate2D(p2x, p2y, alpha)
+            pAx, pAy = h.rotate2D(p1x, p1y, alpha)
+            pCx, pCy = h.rotate2D(pAx, pAy, math.pi)
+            pDx, pDy = h.rotate2D(pBx, pBy, math.pi)
+            """
             # draw
             cr.move_to(pAx, pAy)
             cr.line_to(pBx, pBy)
@@ -352,6 +372,24 @@ class PyApp(gtk.Window):
 
         return
 
+    def drawAngleIndicators(self, radius, xc, yc, cr):
+        cr.save()
+        cr.set_line_width(5)
+        cr.set_source_rgb(1, 1, 1)
+        cr.translate(xc, yc)
+        angles = [0, -30, 30, -60, 60, -90, 90]
+        for angle in angles:
+            drawAngle = 180 - (angle - 90)
+            cr.move_to(0, 0)
+            aPx = radius + radius*0.35
+            aPy = 0
+            rPx, rPy = h.rotate2D(aPx, aPy, math.radians(drawAngle))
+            cr.line_to(rPx, rPy)
+            cr.stroke()
+            self.drawTextAt(str(angle) + "°", rPx, rPy, self.h/50, cr)
+        
+        cr.restore()
+
 
     # returns a tuple (x, y, z, w)
     def getNextSampleQuaternion(self):
@@ -366,6 +404,30 @@ class PyApp(gtk.Window):
 
         print("Input getNext... ", roll, pitch, yaw)
         return h.Euler_toQuaternion(roll, pitch, yaw)
+
+    def drawBackground(self, cr):
+        cr.save()
+        cr.set_source_rgb(0.9, 0.9, 0.9)
+        cr.rectangle(0, 0, self.w, self.h)
+        cr.fill()
+        cr.restore()
+
+    def drawData(self, cr):
+        pass
+
+    def drawSpeed(self, cr):
+        strToRender = "Speed: " + str(self.speed) + " m/s"
+        self.drawTextAt(strToRender, 3*self.w/4, self.h/32, self.h/42, cr)
+
+    def drawTextAt(self, text, x, y, fontsize, cr):
+        cr.save()
+        cr.set_source_rgb(1, 0, 0)
+        cr.select_font_face("Courier", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+        cr.set_font_size(fontsize)
+        (_x, _y, width, height, dx, dy) = cr.text_extents(text) 
+        cr.move_to(x - width/2, y)
+        cr.show_text(text)
+        cr.restore()
 
 if __name__ == "__main__":
     app = PyApp()
