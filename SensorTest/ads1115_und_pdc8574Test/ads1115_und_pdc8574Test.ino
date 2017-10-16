@@ -51,7 +51,7 @@ float Voltage = 0.0;
 #include <Wire.h>
 #define looplength 100
 
-#define pcf8574_adress 0x27
+#define pcf8574_adress 0x20
 
 unsigned int calibrationData[7];
 typedef struct {
@@ -89,7 +89,7 @@ void setup() {
   Serial.println("Starte setup");
 
 ads.begin();
-
+ads.setGain(GAIN_TWOTHIRDS);
 }
 
 
@@ -100,7 +100,6 @@ void loop() {
 
   adc0 = ads.readADC_SingleEnded(0);
   Voltage = (adc0 * 0.1875)/1000;
-  
   Serial.print("AIN0: "); 
   Serial.print(adc0);
   Serial.print("\tVoltage: ");
@@ -133,9 +132,44 @@ void loop() {
   Serial.println();
   
   delay(1000);
+  
   Serial.println("All on ");
   IOexpanderWrite(pcf8574_adress, 0xFF);
-  delay(10000);
+  
+  delay(1000);
+   adc0 = ads.readADC_SingleEnded(0);
+  Voltage = (adc0 * 0.1875)/1000;
+  Serial.print("AIN0: "); 
+  Serial.print(adc0);
+  Serial.print("\tVoltage: ");
+  Serial.println(Voltage, 7);  
+  Serial.println();
+ delay(1000);
+  adc0 = ads.readADC_SingleEnded(1);
+  Voltage = (adc0 * 0.1875)/1000;
+  
+  Serial.print("AIN1: "); 
+  Serial.print(adc0);
+  Serial.print("\tVoltage: ");
+  Serial.println(Voltage, 7);  
+  Serial.println();
+   delay(1000);
+ adc0 = ads.readADC_SingleEnded(2);
+  Voltage = (adc0 * 0.1875)/1000;
+   Serial.print("AIN2: "); 
+  Serial.print(adc0);
+  Serial.print("\tVoltage: ");
+  Serial.println(Voltage, 7);  
+  Serial.println();
+   delay(1000);
+   adc0 = ads.readADC_SingleEnded(3);
+  Voltage = (adc0 * 0.1875)/1000;
+  Serial.print("AIN3: "); 
+  Serial.print(adc0);
+  Serial.print("\tVoltage: ");
+  Serial.println(Voltage, 7);  
+  Serial.println();
+  
 
    Serial.println("All off ");
  IOexpanderWrite(pcf8574_adress, 0x00);
