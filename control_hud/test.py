@@ -22,13 +22,16 @@ import threading
 import cairo
 import math
 import serial
+import queue
 from time import sleep
 gi.require_version('Gtk', '2.0')
 from gi.repository import Gtk as gtk
 from gi.repository import GObject as gobject
 
-# local file
+
+# local files
 import helper as h
+import udpreceiver
 
 
 # flags
@@ -125,8 +128,16 @@ class PyApp(gtk.Window):
 
         # read quaternions concurrently
         if useSerial:
-        	t = threading.Thread(None, self.read_serial)
-        	t.start()
+            t = threading.Thread(None, self.read_serial)
+            t.start()
+
+        # input queue (data from udpreceiver)
+        self.queue = queue.Queue()
+        udp_receiver = udpreceiver.UdpReceiver()
+        t_udp = threading.Thread(None, udp_receiver.listen, args=(self.queue, ))
+        t_udp.start()
+
+        print("__init__ Setup OK")
 
     # blocking call
     # always read from the serial port and store the quaternion to self.sensorQuaternion
@@ -147,6 +158,44 @@ class PyApp(gtk.Window):
             print("Error while using serialport: ", e)
             sys.exit(-1)
 
+
+    def check_queue(self, cr):
+        """
+        check self.queue for new items
+        :return:
+        """
+        if self.queue.empty():
+            return
+
+        item_to_parse: dict = self.queue.get(block=False)
+        self.parse_and_draw_stuff(cr, item_to_parse)
+
+
+    def parse_and_draw_stuff(self, cr, to_parse: dict):
+        print("Draw Thread: Got queue item:", to_parse)
+
+        # more json keys go here
+        # TODO draw everything you get in here
+        c_debug = "debug"
+        c_magneto = "mag"
+        if c_debug in to_parse:
+            val = to_parse[c_debug]
+            print(c_debug, val)
+            self.draw_debug(cr, val)
+        elif c_magneto in to_parse:
+            val = to_parse[c_magneto]
+            print(c_magneto, val)
+            self.draw_magneto(cr, val)
+
+    def draw_debug(self, cr, m_str: str):
+        # TODO grahpics
+        pass
+
+    def draw_magneto(self, cr, val):
+        # TODO grahpics
+        pass
+
+
     def timer_next(self):
         self.queue_draw()
         gobject.timeout_add(1000/framerate, self.timer_next)
@@ -165,6 +214,10 @@ class PyApp(gtk.Window):
         cr.stroke_preserve()
 
     def render(self, widget, event):
+
+
+
+
         self.x+=1
 
 
@@ -198,6 +251,9 @@ class PyApp(gtk.Window):
         self.drawOutlines(cr)
         cr.restore()
 
+        cr.save()
+        self.check_queue(cr)
+        cr.restore()
 
     # q: quaternion (x, y, z, w)
     def drawArtificialHorizon(self, q, cr):
