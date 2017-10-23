@@ -76,14 +76,12 @@ void decode(struct ringbuf *buf, void (*handle)(union packet *)) {
       packet_size = sizeof(packet.debug);
       break;
     }
-
     if (packet_size > 0) {
       // possibly a packet
       if (data_size < packet_size + 1) {
         // not enough data to verify the packet
         return;
       }
-
       uint8_t checksum = 0;
       for (size_t i = 0; i < packet_size; ++i) {
         checksum ^= packet.bytes[i] = *ringbuf_ptr(buf, buf->head, i);

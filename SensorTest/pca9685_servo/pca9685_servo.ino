@@ -39,12 +39,12 @@
       MOSI2   B15 (MOSI2)
       CS      A15
       INT     B5
-      Comment 
+      Comment
       Achtung in Headerfile
       #else // Arduino Due
       #define WIRE Wire
       Zeile 25 aendern
- 
+
 */
 
 #include "includes.h"
@@ -56,7 +56,7 @@
 // called this way, it uses the default address 0x40
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
-#define SERVOMIN  150 // this is the 'minimum' pulse length count (out of 4096)
+#define SERVOMIN  200 // this is the 'minimum' pulse length count (out of 4096)
 #define SERVOMAX  600 // this is the 'maximum' pulse length count (out of 4096)
 
 // our servo # counter
@@ -97,10 +97,10 @@ void setup() {
   delay(1000);
 
   Serial.println("Starte setup");
-Wire.begin();
+  Wire.begin();
 
   pwm.begin();
-  
+
   pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
   Serial.println("Init complete");
 }
@@ -109,33 +109,33 @@ Wire.begin();
 void loop() {
 
 
- Serial.println(servonum);
-  for (uint16_t pulselen = SERVOMIN; pulselen < SERVOMAX; pulselen++) {
-    pwm.setPWM(servonum, 0, pulselen);
-  }
-  delay(500);
-  for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) {
-    pwm.setPWM(servonum, 0, pulselen);
-  }
-  delay(500);
+  for (int16_t cnt = 0; cnt < 255; cnt=cnt+10)
+  {
+   setServo(0,cnt);
+   setServo(1,cnt);
+   delay(10);
 
-  servonum ++;
-  if (servonum > 1) servonum = 0;
+  }
+  
+  for (int16_t cnt = 255; cnt > 0; cnt=cnt-10)
+  {
+   setServo(0,cnt);
+   setServo(1,cnt);
+   delay(10);
+
+  }
 
 
 }
 
-void setServoPulse(uint8_t n, double pulse) {
-  double pulselength;
-  
-  pulselength = 1000000;   // 1,000,000 us per second
-  pulselength /= 60;   // 60 Hz
-  Serial.print(pulselength); Serial.println(" us per period"); 
-  pulselength /= 4096;  // 12 bits of resolution
-  Serial.print(pulselength); Serial.println(" us per bit"); 
-  pulse *= 1000;
-  pulse /= pulselength;
-  Serial.println(pulse);
-  pwm.setPWM(n, 0, pulse);
+
+void setServo(uint8_t ch, uint8_t pos)
+{
+  uint16_t res;
+  res = (SERVOMAX - SERVOMIN) * pos  / 256;
+  //Serial.print("DEbug setServo");
+  //Serial.println(res);
+  pwm.setPWM(ch, 0, res + SERVOMIN);
+
 }
 

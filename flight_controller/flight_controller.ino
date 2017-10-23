@@ -42,7 +42,7 @@
 */
 
 #include "radio_packet.h"
-
+#include <Wire.h>
 #define looplength 100
 
 typedef struct {
@@ -67,7 +67,7 @@ unsigned long time;
 void setup() {
   radio_setup(&Serial, PA12, 115200);
   radio_configure_baud(115200);
-  radio_configure_channel(5);
+  radio_configure_channel(4);
   radio_debug("SOEREN - Self On Earth Returning Experimental Navigator\n");
   radio_debug("Radio check:\n");
   radio_debug("\t115200 Baud.\n");
@@ -77,9 +77,7 @@ void setup() {
   radio_debug("Radio check complete.\n");
 
   radio_debug("Initializing:\n");
-  radio_debug("\tRudder servos...");
-  rudders_setup();
-  radio_debug(" done.\n");
+
 
   radio_debug("\tGPS...");
   gps_setup(&Serial2);
@@ -96,7 +94,10 @@ void setup() {
   radio_debug("\tOrientation sensor...");
   orientation_setup();
   radio_debug(" done.\n");
+  radio_debug("\tRudder servos...");
 
+  rudders_setup();
+  radio_debug(" done.\n");
   radio_debug("Initialization Complete.\n");
 
   radio_debug("\n\"Look at you, soaring through the air without a care in the "
@@ -141,9 +142,7 @@ void send_telemetry(unsigned telemetry) {
 void handle_packet(union packet *packet) {
   switch (packet->tag) {
   case PKT_CONTROL:
-    rudders_update(packet->control.control[0], packet->control.control[1],
-        packet->control.control[2], packet->control.control[3],
-        packet->control.control[4]);
+    rudders_update(packet->control.control);
     send_telemetry(~0ul);
     time = millis() + looplength;
     break;
@@ -207,7 +206,7 @@ void loop() {
   if (next_telemetry_flags && now > next_telemetry_update) {
     next_telemetry_update = now + 100;
 
-    send_telemetry(next_telemetry_flags);
+    send_telemetry(0);
     next_telemetry_flags = 0;
   }
 }
