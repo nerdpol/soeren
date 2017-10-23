@@ -22,23 +22,20 @@ import threading
 import cairo
 import math
 import serial
-import queue
 from time import sleep
 gi.require_version('Gtk', '2.0')
 from gi.repository import Gtk as gtk
 from gi.repository import GObject as gobject
 
-
-# local files
+# local file
 import helper as h
-import udpreceiver
 
 
 # flags
 useSerial = False
-serialport = "/dev/ttyUSB3"
+serialport = "/dev/ttyUSB0"
 serialbaud = 115200
-framerate = 1
+framerate = 10
 RADIUS_DIVIDER = 3.2
 
 
@@ -57,6 +54,10 @@ if args.serialport:
 	serialport = args.serialport
 if args.serialbaud:
 	serialbaud = args.serialbaud
+
+
+def exit():
+    pass
 
 
 class PyApp(gtk.Window):
@@ -131,70 +132,24 @@ class PyApp(gtk.Window):
             t = threading.Thread(None, self.read_serial)
             t.start()
 
-        # input queue (data from udpreceiver)
-        self.queue = queue.Queue()
-        udp_receiver = udpreceiver.UdpReceiver()
-        t_udp = threading.Thread(None, udp_receiver.listen, args=(self.queue, ))
-        t_udp.start()
-
-        print("__init__ Setup OK")
-
     # blocking call
     # always read from the serial port and store the quaternion to self.sensorQuaternion
     # TODO xyzw vs wxyz??
     def read_serial(self):
-        try:
-            ser = serial.Serial(serialport, baudrate=serialbaud)
-            while True:
+        ser = serial.Serial(serialport, baudrate=serialbaud)
+        print("ser defined")
+        while True:
+            try:
                 byts = ser.readline()
                 with self.lock:
                     sq = eval(byts)
-                    lastx = sq[0]
-                    sq.remove(0)
-                    sq.append(lastx)
+                    #sq.insert(0, sq[3])
+                    #sq.pop(4)
                     self.sensorQuaternion = sq
-                    print("Last sensor val: ", self.sensorQuaternion)
-        except serial.serialutil.SerialException as e:
-            print("Error while using serialport: ", e)
-            sys.exit(-1)
-
-
-    def check_queue(self, cr):
-        """
-        check self.queue for new items
-        :return:
-        """
-        if self.queue.empty():
-            return
-
-        item_to_parse: dict = self.queue.get(block=False)
-        self.parse_and_draw_stuff(cr, item_to_parse)
-
-
-    def parse_and_draw_stuff(self, cr, to_parse: dict):
-        print("Draw Thread: Got queue item:", to_parse)
-
-        # more json keys go here
-        # TODO draw everything you get in here
-        c_debug = "debug"
-        c_magneto = "mag"
-        if c_debug in to_parse:
-            val = to_parse[c_debug]
-            print(c_debug, val)
-            self.draw_debug(cr, val)
-        elif c_magneto in to_parse:
-            val = to_parse[c_magneto]
-            print(c_magneto, val)
-            self.draw_magneto(cr, val)
-
-    def draw_debug(self, cr, m_str: str):
-        # TODO grahpics
-        pass
-
-    def draw_magneto(self, cr, val):
-        # TODO grahpics
-        pass
-
+                    print("sensor (parsed): ", self.sensorQuaternion)
+            except Exception as e:
+                print("Error while using serialport: ", e)
+                #sys.exit(-1)
 
     def timer_next(self):
         self.queue_draw()
@@ -214,10 +169,6 @@ class PyApp(gtk.Window):
         cr.stroke_preserve()
 
     def render(self, widget, event):
-
-
-
-
         self.x+=1
 
 
@@ -251,9 +202,6 @@ class PyApp(gtk.Window):
         self.drawOutlines(cr)
         cr.restore()
 
-        cr.save()
-        self.check_queue(cr)
-        cr.restore()
 
     # q: quaternion (x, y, z, w)
     def drawArtificialHorizon(self, q, cr):
@@ -263,23 +211,23 @@ class PyApp(gtk.Window):
         y_deg = xyz[1]
         z_deg = xyz[2]
         yaw = math.radians(x_deg)
-        pitch = math.radians(y_deg)
-        roll = math.radians(z_deg)
+        roll = -math.radians(y_deg)  # should be fine
+        pitch = math.radians(z_deg)
 
         # x - roll
         # y - pitch
         # z - yaw
         # really?
 
-        print()
-        print()
+        #print()
+        #print()
         # also print an info string if present
         if len(q) == 5:
             print("Info: ", q[4])
-        print("Quaternion:      ", q)
-        print("Euler (°):       ", xyz)
-        print("Euler RPY (Rad): ", (roll, pitch, yaw))
-        print("")
+        #print("Quaternion:      ", q)
+        #print("Euler (°):       ", xyz)
+        #print("Euler RPY (Rad): ", (roll, pitch, yaw))
+        #print("")
 
         mWidth = self.w/2
         mHeight = self.h/2
@@ -296,7 +244,7 @@ class PyApp(gtk.Window):
         # upsideDown stuff is kind of wonky...
         # valueMap is not really fixed?
         isUpsideDown = False
-        w = h.valueMap(pitch, -math.pi, math.pi, -2*radius, 2*radius)
+        w = h.valueMap(pitch, -math.pi, math.pi, -4*radius, 4*radius)
         #if pitch >= math.pi/2 and pitch <= 3*(math.pi/2):
         #    print("Upside down!")
         #    w = -w
@@ -321,7 +269,10 @@ class PyApp(gtk.Window):
 
         # angle indicators
         self.drawAngleIndicators(radius, xc, yc, cr)
-        
+
+        # show angles as text
+        self.showEularianAnglesAsText(cr, xc, mHeight-self.h/32, x_deg, y_deg, z_deg)
+
         # white gap
         cr.set_source_rgb(1, 1, 1)
         cr.arc(xc, yc, radius+radius*0.05, 0, 2*math.pi)
@@ -343,7 +294,7 @@ class PyApp(gtk.Window):
         cr.fill()
 
         # white lines
-        self.drawAttitudeIndicator(radius=radius, alpha=earthEndAngle, mx=mx, my=my, cr=cr)
+        self.drawAttitudeIndicator(radius=radius, alpha=earthEndAngle, mx=xc, my=yc, cr=cr)
 
         # fixed cross indicator (stays at the same position)
         fixedRadius = radius/6
@@ -363,6 +314,8 @@ class PyApp(gtk.Window):
         cr.move_to(mWidth/2, mHeight/2)
         cr.line_to(mWidth/2, mHeight/2 + radius)
         cr.stroke()
+
+
 
 
         # draw the triangle MC?
@@ -386,8 +339,8 @@ class PyApp(gtk.Window):
         # white attitude indicator
         # change those params:
         indicators = 7
-        indicatorGap = radius/16 #px
-        indicatorMaxLen = radius/6
+        indicatorGap = radius/20 #px
+        indicatorMaxLen = radius/5
         indicatorLineWidth = radius/32 #px
 
         cr.set_source_rgb(0.8, 0.8, 0.8)
@@ -428,6 +381,18 @@ class PyApp(gtk.Window):
 
         return
 
+
+    def showEularianAnglesAsText(self, cr, draw_x, draw_y, x, y, z):
+        """
+        draw pitch and roll under artificial horizon
+        """
+        cr.save()
+        cr.set_line_width(5)
+        cr.set_source_rgb(1, 1, 1)
+        self.drawTextAt(f"pitch: {z:.3f},  roll: {y:.3f}", draw_x, draw_y, self.h/50, cr)
+        cr.restore()
+
+
     def drawAngleIndicators(self, radius, xc, yc, cr):
         cr.save()
         cr.set_line_width(5)
@@ -443,7 +408,7 @@ class PyApp(gtk.Window):
             cr.line_to(rPx, rPy)
             cr.stroke()
             self.drawTextAt(str(angle) + "°", rPx, rPy, self.h/50, cr)
-        
+
         cr.restore()
 
 
@@ -480,7 +445,7 @@ class PyApp(gtk.Window):
         cr.set_source_rgb(1, 0, 0)
         cr.select_font_face("Courier", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         cr.set_font_size(fontsize)
-        (_x, _y, width, height, dx, dy) = cr.text_extents(text) 
+        (_x, _y, width, height, dx, dy) = cr.text_extents(text)
         cr.move_to(x - width/2, y)
         cr.show_text(text)
         cr.restore()
