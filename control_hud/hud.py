@@ -12,7 +12,8 @@
 # TODO
 ###
 # - Gradindikator außen um künstlichen Horizont
-# - Weiße Linien sind fix (um die Mitte)
+# - Himmelsrichtungen (mit bar)
+# - Höhen- und Geschwindigkeitsverlauf (Diagramm via Ringpuffer)
 
 
 import argparse
@@ -36,7 +37,18 @@ useSerial = False
 serialport = "/dev/ttyUSB0"
 serialbaud = 115200
 framerate = 10
+
+# constants
 RADIUS_DIVIDER = 3.2
+LINEAR_DIVIDER_HEIGHT = 8
+LINEAR_DIVIDER_WIDTH  = 12
+# m
+SENSOR_HEIGHT_MIN     = 0
+SENSOR_HEIGHT_MAX     = 30000
+# m/s
+SENSOR_SPEED_MIN      = 0
+SENSOR_SPEED_MAX      = 100
+
 
 
 # parse commandline arguments
@@ -195,7 +207,11 @@ class PyApp(gtk.Window):
         cr.restore()
 
         cr.save()
-        self.drawSpeed(cr)
+        self.drawSpeed(cr, self.w/4, 3*self.h/4, self.x%100)
+        cr.restore()
+
+        cr.save()
+        self.drawHeight(cr, 3*self.w/4, 3*self.h/4, (self.x*10)%30000)
         cr.restore()
 
         cr.save()
@@ -389,7 +405,7 @@ class PyApp(gtk.Window):
         cr.save()
         cr.set_line_width(5)
         cr.set_source_rgb(1, 1, 1)
-        self.drawTextAt(f"pitch: {z:.3f},  roll: {y:.3f}", draw_x, draw_y, self.h/50, cr)
+        self.drawTextAt(cr, f"pitch: {z:.3f},  roll: {y:.3f}", draw_x, draw_y, self.h/50)
         cr.restore()
 
 
@@ -407,7 +423,7 @@ class PyApp(gtk.Window):
             rPx, rPy = h.rotate2D(aPx, aPy, math.radians(drawAngle))
             cr.line_to(rPx, rPy)
             cr.stroke()
-            self.drawTextAt(str(angle) + "°", rPx, rPy, self.h/50, cr)
+            self.drawTextAt(cr, str(angle) + "°", rPx, rPy, self.h/50)
 
         cr.restore()
 
@@ -433,16 +449,98 @@ class PyApp(gtk.Window):
         cr.fill()
         cr.restore()
 
-    def drawData(self, cr):
+
+    def drawHeight(self, cr, xc, yc, height):
+        """
+        draw a height indicator around (xc, yc)
+        :param cr: drawing context
+        :param xc: center x
+        :param yc: center y
+        :param height: height in meters
+        :return: -
+        """
+        cr.save()
+        #print("drawHeight")
+
+        cr.translate(xc, yc)
+
+        # headline text
+        self.drawTextAt(cr, "Height (m)", 0, -self.h / LINEAR_DIVIDER_HEIGHT * 1.2, 15, color=(0, 0, 1))
+
+        # surrounding rect
+        print("drawSpeed")
+        cr.set_source_rgb(1, 0, 0)
+        cr.rectangle(-self.w / LINEAR_DIVIDER_WIDTH, -self.h / LINEAR_DIVIDER_HEIGHT, self.w / LINEAR_DIVIDER_WIDTH * 2,
+                     self.h / LINEAR_DIVIDER_HEIGHT * 2)
+        cr.fill()
+
+        # indicator line
+        slideHeight = h.valueMap(height, SENSOR_HEIGHT_MIN, SENSOR_HEIGHT_MAX, self.h / LINEAR_DIVIDER_HEIGHT,
+                                 -self.h / LINEAR_DIVIDER_HEIGHT)
+        cr.set_source_rgb(0, 0, 1)
+        cr.move_to(-self.w / LINEAR_DIVIDER_WIDTH, slideHeight)
+        cr.line_to(self.w / LINEAR_DIVIDER_WIDTH, slideHeight)
+        cr.stroke()
+
+        # indicator text (value)
+        self.drawTextAt(cr, str(height) + "", self.w / LINEAR_DIVIDER_WIDTH * 1.5, slideHeight, 16, color=(0, 0, 1))
+
+        # Min & Max
+        self.drawTextAt(cr, str(SENSOR_HEIGHT_MIN), self.w / LINEAR_DIVIDER_WIDTH * 1.5,
+                        +1.1 * self.h / LINEAR_DIVIDER_HEIGHT, 10, color=(0, 0, 1))
+        self.drawTextAt(cr, str(SENSOR_HEIGHT_MAX), self.w / LINEAR_DIVIDER_WIDTH * 1.5,
+                        -1.1 * self.h / LINEAR_DIVIDER_HEIGHT, 10, color=(0, 0, 1))
+
+        cr.restore()
         pass
 
-    def drawSpeed(self, cr):
-        strToRender = "Speed: " + str(self.speed) + " m/s"
-        self.drawTextAt(strToRender, 3*self.w/4, self.h/32, self.h/42, cr)
+    def drawSpeed(self, cr, xc, yc, speed):
+        """
+        draw a speed indicator around (xc, yc)
+        :param cr: drawing context
+        :param xc: center x
+        :param yc: center y
+        :param speed: in m/s
+        :return:
+        """
 
-    def drawTextAt(self, text, x, y, fontsize, cr):
         cr.save()
+
+
+        cr.translate(xc, yc)
+
+        # headline text
+        self.drawTextAt(cr, "Speed (m/s)", 0, -self.h/LINEAR_DIVIDER_HEIGHT * 1.2, 15, color=(0, 0, 1))
+
+        # surrounding rect
+        print("drawSpeed")
         cr.set_source_rgb(1, 0, 0)
+        cr.rectangle(-self.w/LINEAR_DIVIDER_WIDTH, -self.h/LINEAR_DIVIDER_HEIGHT, self.w/LINEAR_DIVIDER_WIDTH*2, self.h/LINEAR_DIVIDER_HEIGHT*2)
+        cr.fill()
+
+        # indicator line
+        slideHeight = h.valueMap(speed, SENSOR_SPEED_MIN, SENSOR_SPEED_MAX, self.h/LINEAR_DIVIDER_HEIGHT, -self.h/LINEAR_DIVIDER_HEIGHT)
+        cr.set_source_rgb(0, 0, 1)
+        cr.move_to(-self.w/LINEAR_DIVIDER_WIDTH, slideHeight)
+        cr.line_to(self.w/LINEAR_DIVIDER_WIDTH, slideHeight)
+        cr.stroke()
+
+        # indicator text (value)
+        self.drawTextAt(cr, str(speed) + "", self.w/LINEAR_DIVIDER_WIDTH * 1.5, slideHeight, 16, color=(0,0,1))
+
+        # Min & Max
+        self.drawTextAt(cr, str(SENSOR_SPEED_MIN), self.w / LINEAR_DIVIDER_WIDTH * 1.5, +1.1*self.h/LINEAR_DIVIDER_HEIGHT, 10, color=(0, 0, 1))
+        self.drawTextAt(cr, str(SENSOR_SPEED_MAX), self.w / LINEAR_DIVIDER_WIDTH * 1.5, -1.1*self.h/LINEAR_DIVIDER_HEIGHT, 10, color=(0, 0, 1))
+
+        cr.restore()
+
+        # old draw
+        #strToRender = "Speed: " + str(self.speed) + " m/s"
+        #self.drawTextAt(cr, strToRender, 3*self.w/4, self.h/32, self.h/42)
+
+    def drawTextAt(self, cr, text, x, y, fontsize, color=(1,0,0)):
+        cr.save()
+        cr.set_source_rgb(color[0], color[1], color[2])
         cr.select_font_face("Courier", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         cr.set_font_size(fontsize)
         (_x, _y, width, height, dx, dy) = cr.text_extents(text)
