@@ -17,14 +17,38 @@ class joyStick():
         print(joystick_instance.get_name())
         print(joystick_instance.get_numaxes())
 
-        while True:
-            pygame.event.get()
+        # while True:
+        #     pygame.event.get()
+        #
+        #     # get_axis(0) -> roll
+        #     # get_axis(1) -> pitch
+        #     # get_axis(2) -> yawn
+        #     # get_axis(3) -> roll
+        #     print(joystick_instance.get_axis(3))
 
-            # get_axis(0) -> roll
-            # get_axis(1) -> pitch
-            # get_axis(2) -> yawn
-            # get_axis(3) -> roll
-            print(joystick_instance.get_axis(3))
+        axes = [0.0] * joystick_instance.get_numaxes()
+        buttons = [False] * joystick_instance.get_numbuttons()
+
+        keep_alive = True
+
+        while keep_alive:
+            event = pygame.event.wait()
+            if event.type == pygame.QUIT:
+                keep_alive = False
+            elif event.type == pygame.JOYAXISMOTION:
+                e = event.dict
+                #get event for axes movement
+                print(e)
+            elif event.type in [pygame.JOYBUTTONUP, pygame.JOYBUTTONDOWN]:
+                e = event.dict
+                print(e)
+
+class joyStickCanvas():
+    def __init__(self):
+        pass
+
+    def canvas(self):
+        pass
 
 class UiDemo(QtWidgets.QDialog):
     # constructor
@@ -48,7 +72,7 @@ def _main(argv):
         Main function to avoid pylint complains concerning constant names.
     """
     app = QtWidgets.QApplication(argv)
-    uiDemo = UiDemo()
+    #uiDemo = UiDemo()
 
     joystick = joyStick()
     joystick.start()
