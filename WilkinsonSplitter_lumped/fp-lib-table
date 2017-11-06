@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name ConnMolex_SMA)(type KiCad)(uri ${KIPRJMOD}/footprints/ConnMolex_SMA.pretty)(options "")(descr ""))
+)
