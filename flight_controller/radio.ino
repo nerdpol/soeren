@@ -20,6 +20,7 @@ void radio_setup(HardwareSerial *serial, int mode_pin, long initial_baud) {
   digitalWrite(mode_pin, HIGH);
   delay(100);
   serial->begin(initial_baud);
+  serial->setTimeout(0);
   ringbuf_init(&radio.buffer);
 }
 
@@ -72,7 +73,7 @@ void radio_configure_channel(int ch) {
 void radio_update(void (*handle)(union packet *)) {
   while (radio.serial->available() > 0) {
     uint8_t buf[sizeof(radio.buffer.buffer)];
-    int buf_bytes = radio.serial->readBytes(buf, sizeof(buf));
+    int buf_bytes = radio.serial->readBytes(buf, ringbuf_space(&radio.buffer));
     ringbuf_put_many(&radio.buffer, buf, buf_bytes);
     decode(&radio.buffer, handle);
   }

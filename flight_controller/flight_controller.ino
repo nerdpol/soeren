@@ -77,8 +77,11 @@ void setup() {
   radio_debug("Radio check complete.\n");
 
   radio_debug("Initializing:\n");
-
-
+  Wire.begin();
+  radio_debug("\tRudder servos...");
+  rudders_setup();
+  radio_debug(" done.\n");
+  
   radio_debug("\tGPS...");
   gps_setup(&Serial2);
   radio_debug(" done.\n");
@@ -86,18 +89,17 @@ void setup() {
   radio_debug("\tAtmospheric sensors...");
   atmosphere_setup();
   radio_debug(" done.\n");
-
+/*
   radio_debug("\tPower sensor...");
   power_setup();
   radio_debug(" done.\n");
-
+*/
   radio_debug("\tOrientation sensor...");
   orientation_setup();
   radio_debug(" done.\n");
-  radio_debug("\tRudder servos...");
-
-  rudders_setup();
-  radio_debug(" done.\n");
+  
+ 
+  
   radio_debug("Initialization Complete.\n");
 
   radio_debug("\n\"Look at you, soaring through the air without a care in the "
@@ -166,7 +168,7 @@ long next_gps_update = 0;
 
 void loop() {
   long now = millis();
-
+  //Serial.print("loop="); Serial.println(now);
   // read radio very often for smooth response
   //if (now > next_radio_update) {
   //  next_radio_update = now + 50;
@@ -182,20 +184,23 @@ void loop() {
   //}
 
   if (now > next_orientation_update) {
+    //Serial.print("orientation="); Serial.println(now);
     next_orientation_update = now + 100;
     orientation_update();
     next_telemetry_flags |= TELEM_FLIGHT | TELEM_MAG;
   }
 
   if (now > next_atmosphere_update) {
+    //Serial.print("atmo="); Serial.println(now);
     next_atmosphere_update = now + 500;
-    atmosphere_update();
+   atmosphere_update();
     next_telemetry_flags |= TELEM_ATMOSPHERE;
   }
 
   if (now > next_power_update) {
+    //Serial.print("pwr="); Serial.println(now);
     next_power_update = now + 500;
-    power_update();
+    //power_update();
     next_telemetry_flags |= TELEM_POWER;
 
     if (flightcontrol_sensors.voltage < 11.0) {
@@ -204,9 +209,10 @@ void loop() {
   }
 
   if (next_telemetry_flags && now > next_telemetry_update) {
+    //Serial.print("telem="); Serial.println(now);
     next_telemetry_update = now + 100;
 
-    send_telemetry(0);
+    send_telemetry(next_telemetry_flags);
     next_telemetry_flags = 0;
   }
 }
