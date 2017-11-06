@@ -11,9 +11,12 @@
 ###
 # TODO
 ###
-# - Gradindikator außen um künstlichen Horizont
 # - Himmelsrichtungen (mit bar)
 # - Höhen- und Geschwindigkeitsverlauf (Diagramm via Ringpuffer)
+# - Diagramm:
+# 	- 100m Schnellindikator
+# - drawArtificialHorizon neu malen (mit Koordinaten (x_todo, y_todo))
+
 
 
 import argparse
@@ -28,8 +31,10 @@ gi.require_version('Gtk', '2.0')
 from gi.repository import Gtk as gtk
 from gi.repository import GObject as gobject
 
-# local file
+# local libs
 import helper as h
+from ringbuf import RingBuffer
+
 
 
 # flags
@@ -48,6 +53,11 @@ SENSOR_HEIGHT_MAX     = 30000
 # m/s
 SENSOR_SPEED_MIN      = 0
 SENSOR_SPEED_MAX      = 100
+
+# diagram
+DIAGRAM_WIDTH_DIVIDER  = 1.5
+DIAGRAM_HEIGHT_DIVIDER = 4
+RINGBUF_CAPACITY       = 50
 
 
 
@@ -144,6 +154,14 @@ class PyApp(gtk.Window):
             t = threading.Thread(None, self.read_serial)
             t.start()
 
+        # create ringbuffers
+        self.ringbuf_speed  = RingBuffer(RINGBUF_CAPACITY)
+        self.ringbuf_height = RingBuffer(RINGBUF_CAPACITY)
+        # and add some dummy values
+        for i in range(RINGBUF_CAPACITY):
+        	self.ringbuf_speed.append(h.valueMap(math.sin(math.cos(i)), -1, 1, SENSOR_SPEED_MIN, SENSOR_SPEED_MAX))
+        	self.ringbuf_height.append(h.valueMap(i, 0, RINGBUF_CAPACITY, SENSOR_HEIGHT_MIN, SENSOR_HEIGHT_MAX))
+
     # blocking call
     # always read from the serial port and store the quaternion to self.sensorQuaternion
     # TODO xyzw vs wxyz??
@@ -201,26 +219,36 @@ class PyApp(gtk.Window):
         if useSerial:
             with self.lock:
                 q = self.sensorQuaternion
-            self.drawArtificialHorizon(q, cr)
+            self.drawArtificialHorizon(q, cr, self.w/3, self.h/4)
         else:
-            self.drawArtificialHorizon(self.realExampleQuats[self.x%self.numRealExampleQuats], cr)
+            self.drawArtificialHorizon(self.realExampleQuats[self.x%self.numRealExampleQuats], cr, self.w/3, self.h/4)
+        cr.restore()
+
+        
+
+        cr.save()
+        self.drawDiagram(cr, self.w/2, 3*self.h/4, self.ringbuf_speed, self.ringbuf_height)
+
+        cr.save()
+        self.drawSpeed(cr, 9*self.w/16, self.h/4, self.x%100)
         cr.restore()
 
         cr.save()
-        self.drawSpeed(cr, self.w/4, 3*self.h/4, self.x%100)
+        self.drawHeight(cr, 5*self.w/6, self.h/4, (self.x*10)%30000)
         cr.restore()
 
-        cr.save()
-        self.drawHeight(cr, 3*self.w/4, 3*self.h/4, (self.x*10)%30000)
-        cr.restore()
+        # update dummies
+        self.ringbuf_speed.append(h.valueMap(math.sin(math.cos(self.x*0.1)), -1, 1, SENSOR_SPEED_MIN, SENSOR_SPEED_MAX))
+        self.ringbuf_height.append(h.valueMap(self.x%RINGBUF_CAPACITY, 0, RINGBUF_CAPACITY, SENSOR_HEIGHT_MIN, SENSOR_HEIGHT_MAX))
 
-        cr.save()
-        self.drawOutlines(cr)
-        cr.restore()
+        # no longer needed
+        #cr.save()
+        #self.drawOutlines(cr)
+        #cr.restore()
 
 
     # q: quaternion (x, y, z, w)
-    def drawArtificialHorizon(self, q, cr):
+    def drawArtificialHorizon(self, q, cr, x_todo, y_todo):
 
         xyz = h.Quaternion_toEulerianAngle(q)
         x_deg = xyz[0]
@@ -493,6 +521,124 @@ class PyApp(gtk.Window):
 
         cr.restore()
         pass
+
+
+    def drawDiagram(self, cr, xc, yc, speed: RingBuffer, height: RingBuffer):
+        cr.save()
+        cr.translate(xc, yc)
+
+        hei = self.h / DIAGRAM_HEIGHT_DIVIDER
+        wid = self.w / DIAGRAM_WIDTH_DIVIDER
+
+        # headline
+        self.drawTextAt(cr, "Speed / Height", 0, -hei/1.5, 15, color=(0,1,0))
+
+        # x axis description
+       	self.drawTextAt(cr, str(RINGBUF_CAPACITY) + "s", 0, 3*hei/4, 15, color=(0,1,0))
+
+        # border
+        cr.rectangle(-wid/2, -hei/2, wid, hei)
+        cr.set_source_rgb(0.5, 0.5, 0)
+        cr.set_line_width(2)
+        cr.stroke()
+
+        # arrows
+        #self.drawArrow(cr, -wid/2, -hei/2, -wid/2, hei/2, 5)
+        #self.drawArrow(cr, -wid/2, -hei/2, wid/2, -hei/2, 5)
+
+        # horizontal
+        self.drawArrow(cr, -wid/2, hei/2, wid/1.7, hei/2, 5)
+        # vertical
+        self.drawArrow(cr, -wid/2, hei/2, -wid/2, -hei/1.7, 5)
+
+        # speed
+        # get speed points
+        # list comprehension spitts out points (x,y) (relative Coordinates)
+        speed_points = \
+        [ 
+        	(h.valueMap(i, 0, RINGBUF_CAPACITY, -wid/2, wid/2), \
+        	h.valueMap(elem, SENSOR_SPEED_MAX, SENSOR_SPEED_MIN, -hei/2, hei/2)) \
+        	for i, elem in enumerate(speed.get())
+        ]
+
+        # draw points
+        lastPoint = speed_points[0]
+        for point in speed_points:
+        	# dot
+        	cr.arc(point[0], point[1], 3, 0, 2*math.pi)
+        	cr.fill()
+
+        	# line to last
+        	cr.move_to(lastPoint[0], lastPoint[1])
+        	cr.line_to(point[0], point[1])
+        	cr.set_line_width(1)
+        	cr.stroke()
+
+        	# update last p
+        	lastPoint = point
+
+
+        # height
+        height_points = \
+        [ 
+        	(h.valueMap(i, 0, RINGBUF_CAPACITY, -wid/2, wid/2), \
+        	h.valueMap(elem, SENSOR_HEIGHT_MAX, SENSOR_HEIGHT_MIN, -hei/2, hei/2)) \
+        	for i, elem in enumerate(height.get())
+        ]
+
+        # draw points
+        cr.set_source_rgb(0, 0.5, 0.5)
+        lastPoint = height_points[0]
+        for point in height_points:
+        	# dot
+        	cr.arc(point[0], point[1], 3, 0, 2*math.pi)
+        	cr.fill()
+
+        	# line to last
+        	cr.move_to(lastPoint[0], lastPoint[1])
+        	cr.line_to(point[0], point[1])
+        	cr.set_line_width(1)
+        	cr.stroke()
+
+        	# update last p
+        	lastPoint = point
+
+
+
+
+        cr.restore()
+        pass
+
+    def drawArrow(self, cr, xa, ya, xb, yb, line_width):
+    	"""
+    	draw an arrow from (xa, ya) to (xb, yb)
+    	using line_width ^^
+    	"""
+    	cr.save()
+
+    	# line
+    	cr.move_to(xa, ya)
+    	cr.line_to(xb, yb)
+    	cr.set_line_width(line_width)
+    	cr.stroke()
+
+    	# head
+    	phi = math.atan2(yb-ya, xb-xa) - math.pi
+    	vec_x = xb - xa
+    	vec_y = yb - ya
+    	r = math.sqrt(vec_x**2 + vec_y**2)
+    	x_dest_1 = (r * math.cos(phi + math.pi/16)) / 8
+    	y_dest_1 = (r * math.sin(phi + math.pi/16)) / 8
+    	x_dest_2 = (r * math.cos(phi - math.pi/16)) / 8
+    	y_dest_2 = (r * math.sin(phi - math.pi/16)) / 8
+    	cr.translate(xb, yb)
+    	cr.move_to(0, 0)
+    	cr.line_to(x_dest_1, y_dest_1)
+    	cr.line_to(x_dest_2, y_dest_2)
+    	cr.fill()
+
+    	cr.restore()
+
 
     def drawSpeed(self, cr, xc, yc, speed):
         """
