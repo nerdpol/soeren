@@ -16,7 +16,8 @@
 # - Diagramm:
 # 	- 100m Schnellindikator
 # - drawArtificialHorizon neu malen (mit Koordinaten (x_todo, y_todo))
-
+# - Schriftgrößen anpassen (Skalierung)
+# - Data class to collect all sensor data
 
 
 import argparse
@@ -24,7 +25,9 @@ import sys
 import gi
 import threading
 import cairo
+import time
 import math
+import random
 import serial
 from time import sleep
 gi.require_version('Gtk', '2.0')
@@ -42,6 +45,7 @@ useSerial = False
 serialport = "/dev/ttyUSB0"
 serialbaud = 115200
 framerate = 10
+useDummyData = True
 
 # constants
 RADIUS_DIVIDER = 3.2
@@ -57,7 +61,11 @@ SENSOR_SPEED_MAX      = 100
 # diagram
 DIAGRAM_WIDTH_DIVIDER  = 1.5
 DIAGRAM_HEIGHT_DIVIDER = 4
-RINGBUF_CAPACITY       = 50
+# what timespan does our diagram capture?
+# in ms
+DIAGRAM_TIMESPAN       = 10000
+RINGBUF_CAPACITY       = 100
+
 
 
 
@@ -77,6 +85,9 @@ if args.serialport:
 if args.serialbaud:
 	serialbaud = args.serialbaud
 
+
+def ms():
+    return int(time.time()*1000.0)
 
 def exit():
     pass
@@ -103,6 +114,7 @@ class PyApp(gtk.Window):
         self.resize(830, 450)
         #self.set_position(gtk.WIN_POS_CENTER)
 
+        #self.connect("destroy", self.quit)
         self.connect("destroy", gtk.main_quit)
 
         darea = gtk.DrawingArea()
@@ -151,16 +163,23 @@ class PyApp(gtk.Window):
 
         # read quaternions concurrently
         if useSerial:
-            t = threading.Thread(None, self.read_serial)
-            t.start()
+            self.t = threading.Thread(None, self.read_serial)
+            self.t.start()
+
+        if useDummyData:
+            self.t2 = threading.Thread(None, self.dummy_data)
+            self.t2.start()
 
         # create ringbuffers
+        # one item is a tuple t:
+        #  t[0] - timestamp in ms
+        #  t[1] - value for speed / height
         self.ringbuf_speed  = RingBuffer(RINGBUF_CAPACITY)
         self.ringbuf_height = RingBuffer(RINGBUF_CAPACITY)
         # and add some dummy values
         for i in range(RINGBUF_CAPACITY):
-        	self.ringbuf_speed.append(h.valueMap(math.sin(math.cos(i)), -1, 1, SENSOR_SPEED_MIN, SENSOR_SPEED_MAX))
-        	self.ringbuf_height.append(h.valueMap(i, 0, RINGBUF_CAPACITY, SENSOR_HEIGHT_MIN, SENSOR_HEIGHT_MAX))
+        	self.ringbuf_speed.append((ms(), h.valueMap(math.sin(math.cos(i)), -1, 1, SENSOR_SPEED_MIN, SENSOR_SPEED_MAX)))
+        	self.ringbuf_height.append((ms(), h.valueMap(i, 0, RINGBUF_CAPACITY, SENSOR_HEIGHT_MIN, SENSOR_HEIGHT_MAX)))
 
     # blocking call
     # always read from the serial port and store the quaternion to self.sensorQuaternion
@@ -184,6 +203,17 @@ class PyApp(gtk.Window):
     def timer_next(self):
         self.queue_draw()
         gobject.timeout_add(1000/framerate, self.timer_next)
+
+
+    def dummy_data(self):
+        while True:
+            sleep(random.uniform(0.05, 0.8))
+            # print("dummy data ringbuffers written")
+            #y = int(input("Input arbitrary data point!"))
+            #self.ringbuf_speed.append((ms(), y))
+            self.ringbuf_speed.append((ms(), h.valueMap(math.sin(math.cos(self.x*0.1)), -1, 1, SENSOR_SPEED_MIN, SENSOR_SPEED_MAX)))
+            self.ringbuf_height.append((ms(), h.valueMap(self.x%RINGBUF_CAPACITY, 0, RINGBUF_CAPACITY, SENSOR_HEIGHT_MIN, SENSOR_HEIGHT_MAX)))
+
 
     # split visible frame into 4 rectangles
     def drawOutlines(self, cr):
@@ -216,21 +246,25 @@ class PyApp(gtk.Window):
         self.drawBackground(cr)
 
         cr.save()
+        xah = self.w/4
+        yah = 0
         if useSerial:
             with self.lock:
                 q = self.sensorQuaternion
-            self.drawArtificialHorizon(q, cr, self.w/3, self.h/4)
+            self.drawArtificialHorizon(q, cr, xah, yah)
         else:
-            self.drawArtificialHorizon(self.realExampleQuats[self.x%self.numRealExampleQuats], cr, self.w/3, self.h/4)
+            self.drawArtificialHorizon(self.realExampleQuats[self.x%self.numRealExampleQuats], cr, xah, yah)
         cr.restore()
 
         
 
         cr.save()
         self.drawDiagram(cr, self.w/2, 3*self.h/4, self.ringbuf_speed, self.ringbuf_height)
+        cr.restore()
 
         cr.save()
-        self.drawSpeed(cr, 9*self.w/16, self.h/4, self.x%100)
+        # self.drawSpeed(cr, 9*self.w/16, self.h/4, self.x%100)
+        self.drawSpeed(cr, self.w/6, self.h/4, self.x%100)
         cr.restore()
 
         cr.save()
@@ -238,8 +272,9 @@ class PyApp(gtk.Window):
         cr.restore()
 
         # update dummies
-        self.ringbuf_speed.append(h.valueMap(math.sin(math.cos(self.x*0.1)), -1, 1, SENSOR_SPEED_MIN, SENSOR_SPEED_MAX))
-        self.ringbuf_height.append(h.valueMap(self.x%RINGBUF_CAPACITY, 0, RINGBUF_CAPACITY, SENSOR_HEIGHT_MIN, SENSOR_HEIGHT_MAX))
+        # no need to, see variable useDummyData
+        #self.ringbuf_speed.append((ms(), h.valueMap(math.sin(math.cos(self.x*0.1)), -1, 1, SENSOR_SPEED_MIN, SENSOR_SPEED_MAX)))
+        #self.ringbuf_height.append((ms(), h.valueMap(self.x%RINGBUF_CAPACITY, 0, RINGBUF_CAPACITY, SENSOR_HEIGHT_MIN, SENSOR_HEIGHT_MAX)))
 
         # no longer needed
         #cr.save()
@@ -249,6 +284,9 @@ class PyApp(gtk.Window):
 
     # q: quaternion (x, y, z, w)
     def drawArtificialHorizon(self, q, cr, x_todo, y_todo):
+        
+        cr.save()
+        cr.translate(x_todo, y_todo)
 
         xyz = h.Quaternion_toEulerianAngle(q)
         x_deg = xyz[0]
@@ -376,6 +414,7 @@ class PyApp(gtk.Window):
         """
 
         cr.reset_clip()
+        cr.restore()
 
 
     def drawAttitudeIndicator(self, radius, alpha, mx, my, cr):
@@ -530,11 +569,16 @@ class PyApp(gtk.Window):
         hei = self.h / DIAGRAM_HEIGHT_DIVIDER
         wid = self.w / DIAGRAM_WIDTH_DIVIDER
 
-        # headline
-        self.drawTextAt(cr, "Speed / Height", 0, -hei/1.5, 15, color=(0,1,0))
+        color_speed  = (0.5, 0, 0.5)
+        color_height = (0, 0.5, 0.5)
+
+        # y axis description
+        # self.drawTextAt(cr, "Speed / Height", 0, -hei/1.5, 15, color=(0,1,0))
+        self.drawTextAt(cr, "Speed", -wid/2, -hei/1.3, 15, color=color_speed)
+        self.drawTextAt(cr, "Height", -wid/2, -hei/1.1, 15, color=color_height)
 
         # x axis description
-       	self.drawTextAt(cr, str(RINGBUF_CAPACITY) + "s", 0, 3*hei/4, 15, color=(0,1,0))
+       	self.drawTextAt(cr, str(DIAGRAM_TIMESPAN) + "ms - " + str(DIAGRAM_TIMESPAN/1000) + "s", 0, 3*hei/4, 15, color=(0,1,0))
 
         # border
         cr.rectangle(-wid/2, -hei/2, wid, hei)
@@ -551,18 +595,26 @@ class PyApp(gtk.Window):
         # vertical
         self.drawArrow(cr, -wid/2, hei/2, -wid/2, -hei/1.7, 5)
 
+        # clip diagram rectangle
+        # (To not draw out of range)
+        cr.rectangle(-wid/2, -hei/2, wid, hei)
+        cr.clip()
+
         # speed
         # get speed points
         # list comprehension spitts out points (x,y) (relative Coordinates)
-        speed_points = \
-        [ 
-        	(h.valueMap(i, 0, RINGBUF_CAPACITY, -wid/2, wid/2), \
-        	h.valueMap(elem, SENSOR_SPEED_MAX, SENSOR_SPEED_MIN, -hei/2, hei/2)) \
-        	for i, elem in enumerate(speed.get())
-        ]
+        current_ms = ms()
+        speed_points_x = (h.valueMap(x[0], current_ms-DIAGRAM_TIMESPAN, current_ms, -wid/2, wid/2) \
+                         for i, x in enumerate(speed.get()) if current_ms - DIAGRAM_TIMESPAN <= x[0])
+        speed_points_y = (h.valueMap(elem[1], SENSOR_SPEED_MAX, SENSOR_SPEED_MIN, -hei/2, hei/2) \
+        	         for i, elem in enumerate(speed.get()) if current_ms - DIAGRAM_TIMESPAN <= elem[0])
+        speed_points = list(zip(speed_points_x, speed_points_y))
+        if len(speed_points) == 0:
+            return
 
         # draw points
         lastPoint = speed_points[0]
+        cr.set_source_rgb(*color_speed)
         for point in speed_points:
         	# dot
         	cr.arc(point[0], point[1], 3, 0, 2*math.pi)
@@ -579,15 +631,16 @@ class PyApp(gtk.Window):
 
 
         # height
-        height_points = \
-        [ 
-        	(h.valueMap(i, 0, RINGBUF_CAPACITY, -wid/2, wid/2), \
-        	h.valueMap(elem, SENSOR_HEIGHT_MAX, SENSOR_HEIGHT_MIN, -hei/2, hei/2)) \
-        	for i, elem in enumerate(height.get())
-        ]
+        height_points_x = (h.valueMap(x[0], current_ms-DIAGRAM_TIMESPAN, current_ms, -wid/2, wid/2) \
+                         for i, x in enumerate(height.get()) if current_ms - DIAGRAM_TIMESPAN <= x[0])
+        height_points_y = (h.valueMap(elem[1], SENSOR_HEIGHT_MAX, SENSOR_HEIGHT_MIN, -hei/2, hei/2) \
+        	         for i, elem in enumerate(height.get()) if current_ms - DIAGRAM_TIMESPAN <= elem[0])
+        height_points = list(zip(height_points_x, height_points_y))
+        if len(height_points) == 0:
+            return
 
         # draw points
-        cr.set_source_rgb(0, 0.5, 0.5)
+        cr.set_source_rgb(*color_height)
         lastPoint = height_points[0]
         for point in height_points:
         	# dot
@@ -603,9 +656,7 @@ class PyApp(gtk.Window):
         	# update last p
         	lastPoint = point
 
-
-
-
+        cr.reset_clip()
         cr.restore()
         pass
 
@@ -693,6 +744,10 @@ class PyApp(gtk.Window):
         cr.move_to(x - width/2, y)
         cr.show_text(text)
         cr.restore()
+
+    def quit(self):
+        # TODO stop threads here
+        gtk.main_quit()
 
 if __name__ == "__main__":
     app = PyApp()
