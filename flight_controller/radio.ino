@@ -77,6 +77,7 @@ void radio_update(void (*handle)(union packet *)) {
     ringbuf_put_many(&radio.buffer, buf, buf_bytes);
     decode(&radio.buffer, handle);
   }
+  //TODO: evaluate heartbeat situation and update channels/rates if necessary (and return 1)
 }
 
 void radio_write(void const *buf, size_t len) {

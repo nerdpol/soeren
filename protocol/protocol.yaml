@@ -1,0 +1,89 @@
+accel:
+  char: "A"
+  fields:
+  - {type: "int16_t", name: "accel", length: 3}
+battery:
+  char: "B"
+  fields:
+  - {type: "int16_t", name: "t_inside"}
+  - {type: "int16_t", name: "t_outside"}
+gps:
+  char: "G"
+  fields:
+  - {type: "uint32_t", name: "latitude"}
+  - {type: "uint32_t", name: "longitude"}
+  - {type: "uint16_t", name: "altitude"}
+  - {type: "uint8_t", name: "links"}
+  - {type: "uint16_t", name: "yaw"}
+  - {type: "uint16_t", name: "velocity"}
+mag:
+  char: "M"
+  fields:
+  - {type: "int16_t", name: "mag", length: 3}
+power:
+  char: "P"
+  fields:
+  - {type: "uint16_t", name: "voltage"}
+  - {type: "int16_t", name: "current"}
+quat:
+  char: "Q"
+  fields:
+  - {type: "float", name: "quat", length: 4}
+telemetry_radio:
+  char: "R"
+  fields: []
+status:
+  char: "S"
+  fields: []
+atmosphere:
+  char: "T"
+  fields:
+  - {type: "int16_t", name: "temperature"}
+  - {type: "uint16_t", name: "pressure"}
+gyro:
+  char: "Y"
+  fields:
+  - {type: "int16_t", name: "gyro", length: 3}
+heartbeat:
+  char: "H"
+  fields:
+  - {type: "char", name: "callsign", length: 12}
+  - {type: "uint8_t", name: "id"}
+  - {type: "uint8_t", name: "hear"}
+debug:
+  char: "D"
+  fields:
+  - {type: "char", name: "message", length: 16}
+control:
+  char: "c"
+  fields: []
+lock:
+  char: "l"
+  fields:
+  - {type: "uint32_t", name: "lock"}
+panic:
+  char: "p"
+  fields:
+  - {type: "uint8_t", name: "payload_ignored"}
+control_radio:
+  char: "r"
+  fields: []
+servos:
+  char: "s"
+  fields:
+  - {type: "uint8_t", name: "servos", length: 8}
+telemetry:
+  char: "t"
+  fields:
+  - {type: "uint32_t", name: "next"}
+  - {type: "uint32_t", name: "always"}
+  - {type: "uint32_t", name: "never"}
+unlock:
+  char: "u"
+  fields:
+  - {type: "uint32_t", name: "unlock"}
+switches:
+  char: "w"
+  fields:
+  - {type: "uint8_t", name: "change_mask"}
+  - {type: "uint8_t", name: "change_value"}

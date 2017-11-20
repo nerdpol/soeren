@@ -1,0 +1,19 @@
+interfaces:
+  - type: serial_single
+    name: radio
+    interface:
+      path: /dev/ttyUSB0
+      uart_baud: 115200
+      radio_baud: 115200
+      radio_channel: 4
+      program_baud: 115200
+    lock: false
+  - type: udp_broadcast
+    name: server
+    port: 7373
+routes:
+  - source: radio
+    sink: server
+
+  - source: server
+    sink: radio
