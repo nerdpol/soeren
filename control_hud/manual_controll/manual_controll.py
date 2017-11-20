@@ -1,7 +1,7 @@
 import sys
 import pygame
 
-from PyQt5 import QtWidgets, QtGui, uic
+from PyQt5 import QtWidgets, QtGui, uic, QtCore
 
 
 class joyStick():
@@ -55,11 +55,13 @@ class UiDemo(QtWidgets.QDialog):
     def __init__(self):
         QtWidgets.QDialog.__init__(self)
         # load and show the user interface created with the designer.
-        self.ui = uic.loadUi('manual_controll.ui')
+        self.ui = uic.loadUi('manual_controll/manual_controll.ui')
 
         self.ui.buttonBox.accepted.connect(self.ok_function)
         self.ui.buttonBox.rejected.connect(self.cancel_function)
+
         self.ui.show()
+
 
     def ok_function(self):
         print("ok")
@@ -72,10 +74,10 @@ def _main(argv):
         Main function to avoid pylint complains concerning constant names.
     """
     app = QtWidgets.QApplication(argv)
-    #uiDemo = UiDemo()
+    uiDemo = UiDemo()
 
-    joystick = joyStick()
-    joystick.start()
+    #joystick = joyStick()
+    #joystick.start()
 
     sys.exit(app.exec_())
 
