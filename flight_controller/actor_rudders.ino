@@ -57,3 +57,66 @@ void setServo(uint8_t ch, uint8_t pos)
  //,Serial.println(res);
  pwm.setPWM(ch, 0, (res + SERVOMIN));
 }
+
+// 
+void rudder_neutral()
+{
+  uint8_t val[] = {127, 127, 127, 127, 127};
+  rudders_update(val);
+}
+
+typedef struct {
+int8_t pitch_trim;
+int16_t pitch_p;
+int8_t pitch_i;
+int16_t pitch_i_past;
+uint16_t pitch_i_past_sat;
+} pitch_struct;
+pitch_struct pitch_t;
+
+
+void update_pitch_i_past(int8_t val)
+{
+  pitch_t.pitch_i_past=pitch_t.pitch_i_past+val;
+  
+  if (pitch_t.pitch_i_past>pitch_t.pitch_i_past_sat){
+    pitch_t.pitch_i_past=pitch_t.pitch_i_past_sat;
+  }
+  if (pitch_t.pitch_i_past<pitch_t.pitch_i_past_sat){
+    pitch_t.pitch_i_past=-pitch_t.pitch_i_past_sat;
+  }
+  
+}
+void pitch_pi_update(float pitch_ist, float pitch_soll)
+{
+  //delat in  Grad
+  float pitch_delta=pitch_ist-pitch_soll;
+
+  if (pitch_delta>0)
+  {
+    pitch_t.update_pitch_i_past(pitch_t.pitch_i);
+  }
+  else
+  {
+    pitch_t.update_pitch_i_past(-pitch_t.pitch_i);
+  }
+
+  float res=pitch_delta*(float)pitch_t.pitch_p/100 +(float)pitch_t.pitch_i_past*0.1 +255;
+  //Servo0 elevator
+  servos.values[0]=uint8_t(res+pitch_t.pitch_trim );
+}
+
+//aileron roll
+//Einfluss auf Rudder
+//offset int8_t aileron_left_trim
+//offset int8_t aileron_right_trim
+//
+
+//rudder
+//offset int8_t rudder_trim
+//
+
+
+
+
+
