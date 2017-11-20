@@ -1,0 +1,9 @@
+f0 = 434MHz
+Z0 = 50 Ohm
+
+R = 2*Z0 = 100 Ohm
+
+Cp = 1/(2*pi*f0*Z0) = 7.33 pF
+Ls = Z0/(2*pi*f0) = 18.34 nH
+
+c.f.: http://data.eefocus.com/myspace/0/2194/bbs/1190602131/84dbcb80.pdf
