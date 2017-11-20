@@ -60,7 +60,7 @@
      </spacer>
     </item>
     <item>
-     <widget class="QGraphicsView" name="graphicsView"/>
+     <widget class="QWidget" name="widget" native="true"/>
     </item>
     <item>
      <spacer name="horizontalSpacer">

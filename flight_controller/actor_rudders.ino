@@ -11,51 +11,28 @@ struct servos {
 } servos;
 
 void rudders_setup() {
-  
   pwm.begin();
-
   pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
 
-  uint8_t val[] = {127, 127, 127, 127, 127};
+  uint8_t val[8] = {127, 127, 127, 127, 127};
   rudders_update(val);
   delay(200);
-
-/*
-  for (uint8_t cnt = 10; cnt < 200; cnt = cnt + 10) {
-    uint8_t val[] = {cnt, cnt, cnt, cnt, cnt};
-    rudders_update(val);
-    delay(100);
-    Serial.println(cnt);
-  }
-  for (uint8_t cnt = 200; cnt > 128; cnt = cnt - 1) {
-    uint8_t val[] = {cnt, cnt, cnt, cnt, cnt};
-    rudders_update(val);
-    delay(10);
-    Serial.println(cnt);
-  }
-  */
 }
 
 void rudders_update(uint8_t * values) { //8 Werte als uint8_t
-  for (uint8_t cnt = 0; cnt < 5; cnt++) {
+  for (uint8_t cnt = 0; cnt < 8; cnt++) {
     if (servos.values[cnt] != values[cnt])
     {
       servos.values[cnt] = values[cnt];
-      //Serial.println("Aenderung!");
       setServo(cnt, servos.values[cnt]);
     }
-
   }
-
 }
 
 void setServo(uint8_t ch, uint8_t pos)
 {
-  uint32_t res;
-  res = (SERVOMAX - SERVOMIN) * pos  / 256;
-  //Serial.print("Debug setServo");
- //,Serial.println(res);
- pwm.setPWM(ch, 0, (res + SERVOMIN));
+  uint32_t res = (SERVOMAX - SERVOMIN) * pos  / 256;
+  pwm.setPWM(ch, 0, (res + SERVOMIN));
 }
 
 // 
