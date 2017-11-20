@@ -1,6 +1,16 @@
 /*
- * ATTN: Change the board settings to disable USB
- * genericSTM32F103C.menu.upload_method.STLinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DGENERIC_BOOTLOADER
+ * Arduino:
+ *   Board: Generic STM32F103C series
+ *   Variant: STM32F103C8 (20k RAM, 64k Flash)
+ *   GPU Speed: 72 MHz
+ *   Upload: STLink
+ * Modifications:
+ *   Board File: don't use USB as serial
+ *      Arduino/hardware/Arduino_STM32/STM32F1/boards.txt:394
+ *      genericSTM32F103C.menu.upload_method.STLinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DGENERIC_BOOTLOADER
+ *   Adafruit PWM Servos Library requires WIRE to be defined to Wire, not Wire1
+ *      Arduino/libraries/Adafruit_PWM_Servo_Driver_Library/Adafruit_PWMServoDriver.cpp:27
+ *      #define WIRE Wire
  *
  * I2C
  *    SCL   B6
@@ -41,30 +51,43 @@
  *    INT     B5
 */
 
-#include "radio_packet.h"
+#define CALL_SIGN {'\r', '\n', 'D', 'F', '0', 'H', 'S', 'A', '-', '1', '\r', '\n'}
+#define HEARTBEAT_ID 0x01
+#define HEARTBEAT_TIMEOUT 2500
+
+#include "protocol.h"
 #include <Wire.h>
 #define looplength 100
 
 typedef struct {
-  uint16_t pressure;
-  uint16_t acc[3];
+  uint16_t accel[3];
   uint16_t mag[3];
-  uint16_t gyr[3];
+  uint16_t gyro[3];
+  float quat[4];
+
+  uint16_t pressure;
   float temperature;
-  float current;
-  float voltage;
+
   float latitude;
   float longitude;
   uint16_t altitude;
   uint8_t links;
   float yaw;
   float velocity;
+
+  float current;
+  float voltage;
+
+  float bat_temp_in;
+  float bat_temp_out;
 } flightcontrol_sensors_t;
 flightcontrol_sensors_t flightcontrol_sensors;
 
 unsigned long time;
 
 void setup() {
+  Wire.begin();
+
   radio_setup(&Serial, PA12, 115200);
   radio_configure_baud(115200);
   radio_configure_channel(4);
@@ -77,7 +100,6 @@ void setup() {
   radio_debug("Radio check complete.\n");
 
   radio_debug("Initializing:\n");
-  Wire.begin();
   radio_debug("\tRudder servos...");
   rudders_setup();
   radio_debug(" done.\n");
@@ -89,40 +111,21 @@ void setup() {
   radio_debug("\tAtmospheric sensors...");
   atmosphere_setup();
   radio_debug(" done.\n");
-/*
-  radio_debug("\tPower sensor...");
-  power_setup();
-  radio_debug(" done.\n");
-*/
+
   radio_debug("\tOrientation sensor...");
   orientation_setup();
   radio_debug(" done.\n");
   
- 
-  
+  radio_debug("\tIO Expander...");
+  ioexpander_setup(0x27);
+  radio_debug(" done.\n");
+
   radio_debug("Initialization Complete.\n");
 
   radio_debug("\n\"Look at you, soaring through the air without a care in the "
               "world. Like an eagle. PILOTING A BLIMP!\" - GLaDOS\n");
 
   time = millis() + looplength;
-}
-
-void send_report() {
-  char info[512];
-  snprintf(info, 256, "REPORT{gyr=(%hu %hu %hu), acc=(%hu %hu %hu), mag=(%hu "
-                      "%hu %hu), temp=%f, pres=%hu, volt=%f, cur=%f, gps={lat=%f, lng=%f, alt=%hu, lnk=%u, yaw=%f, vel=%f}}\n",
-      flightcontrol_sensors.gyr[0], flightcontrol_sensors.gyr[1],
-      flightcontrol_sensors.gyr[2], flightcontrol_sensors.acc[0],
-      flightcontrol_sensors.acc[1], flightcontrol_sensors.acc[2],
-      flightcontrol_sensors.mag[0], flightcontrol_sensors.mag[1],
-      flightcontrol_sensors.mag[2], flightcontrol_sensors.temperature,
-      flightcontrol_sensors.pressure, flightcontrol_sensors.voltage,
-      flightcontrol_sensors.current, flightcontrol_sensors.latitude,
-      flightcontrol_sensors.longitude, flightcontrol_sensors.altitude,
-      flightcontrol_sensors.links, flightcontrol_sensors.yaw,
-      flightcontrol_sensors.velocity);
-  radio_debug(info);
 }
 
 enum {
@@ -134,7 +137,10 @@ enum {
 };
 
 void send_telemetry(unsigned telemetry) {
-  if (telemetry & TELEM_FLIGHT) telemetry_send_flight();
+  if (telemetry & TELEM_FLIGHT) {
+    telemetry_send_accel();
+    telemetry_send_gyro();
+  }
   if (telemetry & TELEM_MAG) telemetry_send_mag();
   if (telemetry & TELEM_ATMOSPHERE) telemetry_send_atmosphere();
   if (telemetry & TELEM_POWER) telemetry_send_power();
@@ -143,63 +149,71 @@ void send_telemetry(unsigned telemetry) {
 
 void handle_packet(union packet *packet) {
   switch (packet->tag) {
-  case PKT_CONTROL:
+  /*case PKT_CONTROL: {
     rudders_update(packet->control.control);
     send_telemetry(~0ul);
     time = millis() + looplength;
-    break;
-  case PKT_REPORT: {
-    send_report();
-  } break;
+  } break; */
   default:
     break;
   }
 }
 
-uint8_t tick = 0;
-
 unsigned next_telemetry_flags = ~0ul;
+#define PERIOD_TELEMETRY 100
 long next_telemetry_update = 0;
+#define PERIOD_ORIENTATION 100
 long next_orientation_update = 0;
+#define PERIOD_ORIENTATION 500
 long next_power_update = 0;
+#define PERIOD_ATMOSPHERE 500
 long next_atmosphere_update = 0;
+#define PERIOD_RADIO 50
 long next_radio_update = 0;
+#define PERIOD_GPS 50
 long next_gps_update = 0;
+#define PERIOD_HEARTBEAT 1000
+long next_heartbeat = 0;
 
 void loop() {
   long now = millis();
   //Serial.print("loop="); Serial.println(now);
   // read radio very often for smooth response
   //if (now > next_radio_update) {
-  //  next_radio_update = now + 50;
+  //  next_radio_update = now + PERIOD_RADIO;
     radio_update(&handle_packet);
   //}
 
   // read gps very often to avoid a buffer overflow (buffer is smaller than complete GPS message)
   //if (now > next_gps_update) {
-  //  next_gps_update = now + 50;
+  //  next_gps_update = now + PERIOD_GPS;
     if (gps_update()) {
       next_telemetry_flags |= TELEM_GPS;
     }
   //}
 
+  if (now > next_heartbeat) {
+    //TODO: toggle heartbeat pin
+    next_heartbeat = now + PERIOD_HEARTBEAT;
+  }
+
   if (now > next_orientation_update) {
     //Serial.print("orientation="); Serial.println(now);
-    next_orientation_update = now + 100;
+    next_orientation_update = now + PERIOD_ORIENTATION;
     orientation_update();
     next_telemetry_flags |= TELEM_FLIGHT | TELEM_MAG;
   }
 
   if (now > next_atmosphere_update) {
     //Serial.print("atmo="); Serial.println(now);
-    next_atmosphere_update = now + 500;
+    next_atmosphere_update = now + PERIOD_ATMOSPHERE;
    atmosphere_update();
     next_telemetry_flags |= TELEM_ATMOSPHERE;
   }
 
   if (now > next_power_update) {
     //Serial.print("pwr="); Serial.println(now);
-    next_power_update = now + 500;
+    next_power_update = now + PERIOD_ORIENTATION;
     //power_update();
     next_telemetry_flags |= TELEM_POWER;
 
@@ -210,9 +224,10 @@ void loop() {
 
   if (next_telemetry_flags && now > next_telemetry_update) {
     //Serial.print("telem="); Serial.println(now);
-    next_telemetry_update = now + 100;
+    next_telemetry_update = now + PERIOD_TELEMETRY;
 
     send_telemetry(next_telemetry_flags);
     next_telemetry_flags = 0;
   }
 }
+
