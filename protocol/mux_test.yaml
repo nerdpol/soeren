@@ -1,8 +1,14 @@
 interfaces:
-  - type: serial_single
+  - type: serial
     name: radio
-    interface:
-      path: /dev/ttyUSB0
+    receivers:
+    - path: /dev/ttyUSB0
+      uart_baud: 115200
+      radio_baud: 115200
+      radio_channel: 4
+      program_baud: 11200
+    sender:
+      path: /dev/ttyUSB1
       uart_baud: 115200
       radio_baud: 115200
       radio_channel: 4
@@ -10,10 +16,10 @@ interfaces:
     lock: false
   - type: udp_broadcast
     name: server
+    bind: '127.0.0.1'
     port: 7373
 routes:
   - source: radio
     sink: server
-
   - source: server
     sink: radio

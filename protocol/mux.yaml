@@ -18,7 +18,7 @@ interfaces:
       radio_channel: 4
       program_baud: 115200
     sender:
-    - path: /dev/ttyUSB0
+      path: /dev/ttyUSB0
       uart_baud: 115200
       radio_baud: 115200
       radio_channel: 4

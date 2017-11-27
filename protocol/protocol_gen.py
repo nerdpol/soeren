@@ -49,36 +49,50 @@ def field_size(field):
 type_specifiers = {"uint8_t": 'B', "int8_t": 'b', "char": 'c', "uint16_t": 'H', "int16_t": 'h', "uint32_t": 'L', "int32_t": 'l', "float": 'f'}
 
 with open(args.python, 'w') as f:
-  f.write("# THIS FILE IS GENERATED, DO NOT EDIT BY HAND\n\nimport struct\n\ndef radio_packet_size(id):\n\treturn {\n")
+  f.write("# THIS FILE IS GENERATED, DO NOT EDIT BY HAND\n\nimport struct\n\n")
+  
+  # Lengths
+  f.write("def radio_packet_size(id):\n\treturn {\n")
   for p, packet_type in packet_types.items():
     packet_type["size"] = sum(field_size(field) for field in packet_type["fields"])
     f.write(f"\t\tb'{packet_type['char']}': {packet_type['size']},\n")
   f.write("\t}.get(id, None)\n\n")
 
+  # Parsing
   f.write("def radio_packet_parse(packet):\n")
   for p, packet_type in packet_types.items():
-    f.write(f'\tif packet[0] == b"{packet_type["char"]}":\n')
-    field_vars = ['_type']
+    f.write(f'\tif packet[0:1] == b"{packet_type["char"]}":\n')
+    field_names = ['_type']
     field_specs = ['c']
+    field_decodes = [f'"{p}"']
+    field_encodes = [f'b"{packet_type["char"]}"']
     for field in packet_type["fields"]:
       if field["type"] == "char" and "length" in field:
         field_specs.append(f"{field['length']}s")
-        field_vars.append(field["name"])
+        field_names.append(field["name"])
+        field_decodes.append(field["name"] + ".decode()")
+        field_encodes.append(f"message['{field['name']}'].encode()")
       elif "length" in field:
         field_specs.append(f"{field['length']}{type_specifiers[field['type']]}")
-        field_vars.extend(f"{field['name']}{i}" for i in range(field["length"]))
+        field_names.extend(f"{field['name']}{i}" for i in range(field["length"]))
+        field_decodes.extend(f"{field['name']}{i}" for i in range(field["length"]))
+        field_encodes.extend(f"message['{field['name']}{i}']" for i in range(field["length"]))
       else:
         field_specs.append(type_specifiers[field['type']])
-        field_vars.append(field["name"])
-    f.write("\t\t" + ','.join(field_vars) + ", = struct.unpack('!" + "".join(field_specs) + "', packet)\n")
-    field_entries = ", ".join(f'"{n}": {n if n != "_type" else chr(34)+p+chr(34)}' for n in field_vars)
+        field_names.append(field["name"])
+        field_decodes.append(field["name"])
+        field_encodes.append(f"message['{field['name']}']")
+    f.write("\t\t" + ','.join(field_names) + ", = struct.unpack('!" + "".join(field_specs) + "', packet)\n")
+    field_entries = ", ".join(f'"{n}": {d}' for n, d in zip(field_names, field_decodes))
     f.write(f"\t\treturn {{{field_entries}}}\n")
-    packet_type['_vars'] = field_vars
+    packet_type['_vars'] = field_names
     packet_type['_specs'] = field_specs
+    packet_type['_encodes'] = field_encodes
   f.write("\n")
 
+  # Packing
   f.write("def radio_packet_pack(message):\n")
   for p, packet_type in packet_types.items():
     f.write(f'\tif message["_type"] == "{p}":\n')
-    f.write(f"\t\treturn struct.pack('!" + "".join(packet_type['_specs']) + "', " + ", ".join((f'message["{n}"]' if n != '_type' else f'b"{packet_type["char"]}"') for n in packet_type['_vars']) + ")\n")
+    f.write(f"\t\treturn struct.pack('!" + "".join(packet_type['_specs']) + "', " + ", ".join(packet_type['_encodes']) + ")\n")
   f.write('\telse:\n\t\traise ValueError("Unknown packet type")\n\n')
