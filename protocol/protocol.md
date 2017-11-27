@@ -5,8 +5,31 @@ The link layer is based on the HC12 radio module operated in the 70cm amateur ba
 The HC12 includes medium access control and modulation.
 Packets begin with a type identifier (one character) that determines their content format and length, and ends with a checksum byte (simple XOR over all bytes BUT the checksum)
 
-## Packet Types
+## protocol.yaml (JSON representation)
 
+```yaml
+
+accel:
+  char: "A"
+  fields:
+  - {type: "int16_t", name: "accel", length: 3}
+battery:
+  char: "B"
+  fields:
+  - {type: "int16_t", name: "t_inside", unit: "1/100 °C"}
+  - {type: "int16_t", name: "t_outside", unit: "1/100 °C"}
+
+``` 
+
+example pakets:
+
+{"_type": "accel", "accel0": accel0, "accel1": accel1, "accel2": accel2}
+
+{"_type": "battery", "t_inside": t_inside, "t_outside": t_outside}
+
+
+## Packet Types (from / to SOEREN, binary encoded)
+ 
 ### Telemetry
  - 'A' <ax in (m/s/s) as int16_t> <ay in (m/s/s) as int16_t> <az in (m/s/s) as int16_t>: Accelerometer (linear acceleration)
  - 'B' <t_bat_in in (°C/100) as int16_t> <t_bat_out in (°C/100) as int16_t>: Battery temperature
