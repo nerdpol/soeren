@@ -29,14 +29,15 @@ import time
 import math
 import random
 import serial
+import json
 from time import sleep
 gi.require_version('Gtk', '2.0')
 from gi.repository import Gtk as gtk
 from gi.repository import GObject as gobject
 
 # local libs
-import helper as h
-from ringbuf import RingBuffer
+import lib.helper as h
+from lib.ringbuf import RingBuffer
 
 
 
@@ -187,14 +188,19 @@ class PyApp(gtk.Window):
     def read_serial(self):
         ser = serial.Serial(serialport, baudrate=serialbaud)
         print("ser defined")
+        dumpfile = open("quats.txt", mode="w")
         while True:
             try:
                 byts = ser.readline()
                 with self.lock:
-                    sq = eval(byts)
+                    sq = json.loads(byts)
+
+                    # save to file
+                    dumpfile.write(str(byts, "ascii"))
+                    
                     #sq.insert(0, sq[3])
                     #sq.pop(4)
-                    self.sensorQuaternion = sq
+                    self.sensorQuaternion = [sq["quat0"], sq["quat1"], sq["quat2"], sq["quat3"]]
                     print("sensor (parsed): ", self.sensorQuaternion)
             except Exception as e:
                 print("Error while using serialport: ", e)

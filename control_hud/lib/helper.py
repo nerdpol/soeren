@@ -1,4 +1,5 @@
 import math
+import time
 
 # return (x, y, z, w)
 def Euler_toQuaternion(roll, pitch, yaw):
@@ -53,3 +54,16 @@ def rotate2D(x, y, alpha):
     r21 = tempSin
     r22 = tempCos
     return (r11*x + r12*y, r21*x + r22*y)
+
+def epoch_ms():
+    millis = int(round(time.time() * 1000))
+    return millis
+
+def progress_bar(x, x_min, x_max, width=30, pchar='#'):
+    print("[ ", end='')
+    converted = int(valueMap(x, x_min, x_max, 0, width))
+    for i in range(converted):
+        print(pchar, end='')
+    for i in range(width-converted):
+        print(" ", end='')
+    print(f" ]  {x} / {x_max}")

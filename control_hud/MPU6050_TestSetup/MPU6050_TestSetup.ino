@@ -286,15 +286,16 @@ void loop() {
         #ifdef OUTPUT_READABLE_QUATERNION
             // display quaternion values in easy matrix form: w x y z
             mpu.dmpGetQuaternion(&q, fifoBuffer);
-            Serial.print("[");
+            Serial.print("{\"_type\":\"quat\"");
+            Serial.print(",\"quat0\":");
             Serial.print(q.w);
-            Serial.print(",");
+            Serial.print(",\"quat1\":");
             Serial.print(q.x);
-            Serial.print(",");
+            Serial.print(",\"quat2\":");
             Serial.print(q.y);
-            Serial.print(",");
+            Serial.print(",\"quat3\":");
             Serial.print(q.z);
-            Serial.println("]");
+            Serial.println("}");
         #endif
 
         #ifdef OUTPUT_READABLE_EULER
