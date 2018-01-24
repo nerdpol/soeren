@@ -76,7 +76,7 @@ class UdpDummySender():
         cur_index = 0
         try:
             while 1:
-                self.cs.sendto(json.dumps(self.quats_dicts[cur_index]).encode(encoding="ascii"), ('255.255.255.255', 5005))
+                self.cs.sendto(json.dumps(self.quats_dicts[cur_index]).encode(encoding="ascii"), ('127.0.0.1', 5005))
                 cur_index += skip + 1
                 cur_index = cur_index % self.quats_len
                 print()
@@ -88,4 +88,4 @@ class UdpDummySender():
 
 if __name__ == '__main__':
     sender = UdpDummySender()
-    sender.send_quat_data(freq = 120, skip = 5)
+    sender.send_quat_data(freq = 15, skip = 3)
