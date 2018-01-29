@@ -71,11 +71,13 @@ void pitch_pi_update(float pitch_ist, float pitch_soll)
 
   if (pitch_delta>0)
   {
-    pitch_t.update_pitch_i_past(pitch_t.pitch_i);
+    //pitch_t.update_pitch_i_past(pitch_t.pitch_i);
+    update_pitch_i_past(pitch_t.pitch_i);
   }
   else
   {
-    pitch_t.update_pitch_i_past(-pitch_t.pitch_i);
+    //pitch_t.update_pitch_i_past(-pitch_t.pitch_i);
+    update_pitch_i_past(-pitch_t.pitch_i);
   }
 
   float res=pitch_delta*(float)pitch_t.pitch_p/100 +(float)pitch_t.pitch_i_past*0.1 +255;
