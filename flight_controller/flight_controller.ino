@@ -56,6 +56,7 @@
 #define HEARTBEAT_TIMEOUT 2500
 
 #include "protocol.h"
+#include "regler.h"
 #include <Wire.h>
 #define looplength 100
 
@@ -82,6 +83,16 @@ typedef struct {
   float bat_temp_out;
 } flightcontrol_sensors_t;
 flightcontrol_sensors_t flightcontrol_sensors;
+
+regler_param_t params_reg_pitch = {
+  .w =0,
+  .x =0,
+  .Kp =0,
+  .Ki =0,
+  .Kd =0,
+  .esum =0,
+  .ealt =0,
+};
 
 unsigned long time;
 
@@ -125,7 +136,7 @@ void setup() {
   radio_debug("\n\"Look at you, soaring through the air without a care in the "
               "world. Like an eagle. PILOTING A BLIMP!\" - GLaDOS\n");
 
-  time = millis() + looplength;
+  time = millis() + looplength;  
 }
 
 enum {
@@ -175,6 +186,10 @@ long next_gps_update = 0;
 #define PERIOD_HEARTBEAT 1000
 long next_heartbeat = 0;
 
+#define PERIOD_REG_PITCH 1000
+long next_reg_pitch = 0;
+long last_reg_pitch = 0;
+
 void loop() {
   long now = millis();
   //Serial.print("loop="); Serial.println(now);
@@ -195,6 +210,13 @@ void loop() {
   if (now > next_heartbeat) {
     //TODO: toggle heartbeat pin
     next_heartbeat = now + PERIOD_HEARTBEAT;
+  }
+
+  if (now > next_reg_pitch) {
+    next_reg_pitch = now + PERIOD_REG_PITCH;
+    last_reg_pitch = next_reg_pitch;
+    uint16_t tmp = regler_fnc(&params_reg_pitch, next_reg_pitch-last_reg_pitch );
+    last_reg_pitch = next_reg_pitch;
   }
 
   if (now > next_orientation_update) {
