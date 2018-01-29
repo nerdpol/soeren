@@ -29,25 +29,24 @@ import time
 import math
 import random
 import serial
+import json
 from time import sleep
 gi.require_version('Gtk', '2.0')
 from gi.repository import Gtk as gtk
 from gi.repository import GObject as gobject
 
 # local libs
-import helper as h
-from ringbuf import RingBuffer
-
-
+import lib.helper as h
+from lib.ringbuf import RingBuffer
+from lib.udp.receiver import UdpReceiverQueues
 
 # flags
-useSerial = False
-serialport = "/dev/ttyUSB0"
-serialbaud = 115200
 framerate = 10
 useDummyData = True
 
 # constants
+UDP_DEFAULT_PORT = 5005
+
 RADIUS_DIVIDER = 3.2
 LINEAR_DIVIDER_HEIGHT = 8
 LINEAR_DIVIDER_WIDTH  = 12
@@ -71,19 +70,15 @@ RINGBUF_CAPACITY       = 100
 
 # parse commandline arguments
 parser = argparse.ArgumentParser(description='Control HUD GUI')
-parser.add_argument('--mode', type=str, help='Either "demo" or "serial"')
-parser.add_argument('--serialport', type=str, help='serial port, defaults to ' + serialport)
-parser.add_argument('--serialbaud', type=str, help='serial baud rate, defaults to ' + str(serialbaud))
+parser.add_argument('--port', type=str, help='udp port to listen to')
 parser.add_argument('--fps', type=str, help='Set the number of rendered frames per second')
 args = parser.parse_args()
-if args.mode == "serial":
-	useSerial = True
 if args.fps:
 	framerate = args.fps
-if args.serialport:
-	serialport = args.serialport
-if args.serialbaud:
-	serialbaud = args.serialbaud
+if args.port:
+	udp_port = args.port
+else:
+    udp_port = UDP_DEFAULT_PORT
 
 
 def ms():
@@ -93,22 +88,27 @@ def exit():
     pass
 
 
-class PyApp(gtk.Window):
+class HeadUpDisplay(gtk.Window):
 
     def __init__(self):
-        super(PyApp, self).__init__()
+        super(HeadUpDisplay, self).__init__()
 
-        # where sensor data gets saved
-        # these should be changed by a separate thread
-        # via lock
-        self.sensorQuaternion = [-1, 0, 0, 0]
+        self.lastSensorQuaternion = [-1, 0, 0, 0]
         self.speed = 0
+
+        self.urq = UdpReceiverQueues()
+        self.quat_queue = self.urq.get_queue("quat")
+
+        # spawn thread to always read
+        self.udp_recv_thread = threading.Thread(None, target=self.urq.listen)
+        self.udp_recv_thread.start()
 
         # runner variables
         self.qe1 = 1
         self.qe2 = 2.2
         self.qe3 = 3
         self.x = 1
+        self.quat_count = 0
 
         self.set_title("Ground Station HUD")
         self.resize(830, 450)
@@ -135,36 +135,8 @@ class PyApp(gtk.Window):
         self.w = self.allocation.width
         self.h = self.allocation.height
 
-
-        # reale sensordaten
-        # w, x, y, z
-        # TODO needed format: xyzw
-        self.realExampleQuats = [
-            # aufrecht
-            [0.85, 0.14, 0.0, -0.51, "aufrecht"],
-            [0.35, 0.03, -0.03, -0.94, "aufrecht"],
-
-            # 45 ° x achse
-            [0.38, 0.13, -0.32, -0.86, "45° x axis"],
-
-            # 90 ° entlang y achse
-            [0.2, -0.63, -0.2, -0.73, "90° y axis"],
-
-            # 45 ° nach unten
-            [0.77, 0.2, 0.24, -0.57, "45° bottom view"]
-        ]
-        self.numRealExampleQuats = len(self.realExampleQuats)
-
         # fire up timer
         self.timer_next()
-
-        # create a lock for self.sensorQuaternion
-        self.lock = threading.Lock()
-
-        # read quaternions concurrently
-        if useSerial:
-            self.t = threading.Thread(None, self.read_serial)
-            self.t.start()
 
         if useDummyData:
             self.t2 = threading.Thread(None, self.dummy_data)
@@ -181,24 +153,6 @@ class PyApp(gtk.Window):
         	self.ringbuf_speed.append((ms(), h.valueMap(math.sin(math.cos(i)), -1, 1, SENSOR_SPEED_MIN, SENSOR_SPEED_MAX)))
         	self.ringbuf_height.append((ms(), h.valueMap(i, 0, RINGBUF_CAPACITY, SENSOR_HEIGHT_MIN, SENSOR_HEIGHT_MAX)))
 
-    # blocking call
-    # always read from the serial port and store the quaternion to self.sensorQuaternion
-    # TODO xyzw vs wxyz??
-    def read_serial(self):
-        ser = serial.Serial(serialport, baudrate=serialbaud)
-        print("ser defined")
-        while True:
-            try:
-                byts = ser.readline()
-                with self.lock:
-                    sq = eval(byts)
-                    #sq.insert(0, sq[3])
-                    #sq.pop(4)
-                    self.sensorQuaternion = sq
-                    print("sensor (parsed): ", self.sensorQuaternion)
-            except Exception as e:
-                print("Error while using serialport: ", e)
-                #sys.exit(-1)
 
     def timer_next(self):
         self.queue_draw()
@@ -245,41 +199,43 @@ class PyApp(gtk.Window):
 
         self.drawBackground(cr)
 
+
+        # Artificial Horizon
         cr.save()
         xah = self.w/4
         yah = 0
-        if useSerial:
-            with self.lock:
-                q = self.sensorQuaternion
-            self.drawArtificialHorizon(q, cr, xah, yah)
-        else:
-            self.drawArtificialHorizon(self.realExampleQuats[self.x%self.numRealExampleQuats], cr, xah, yah)
+        # always use udp
+        try:
+            packet = self.quat_queue.get(block=True, timeout=0.01)
+            self.quat_queue.task_done()
+            q = packet["quat0"], packet["quat1"], packet["quat2"], packet["quat3"]
+            self.lastSensorQuaternion = q
+            self.quat_count += 1
+            print("quat_count:", self.quat_count)
+        except Exception as e:
+            q = self.lastSensorQuaternion
+            print("exc.", e)
+        self.drawArtificialHorizon(q, cr, xah, yah)
         cr.restore()
 
-        
 
+        # diagrams
         cr.save()
         self.drawDiagram(cr, self.w/2, 3*self.h/4, self.ringbuf_speed, self.ringbuf_height)
         cr.restore()
 
+
+        # bar indicator speed ?
         cr.save()
         # self.drawSpeed(cr, 9*self.w/16, self.h/4, self.x%100)
         self.drawSpeed(cr, self.w/6, self.h/4, self.x%100)
         cr.restore()
 
+
+        # bar indictor height ?
         cr.save()
         self.drawHeight(cr, 5*self.w/6, self.h/4, (self.x*10)%30000)
         cr.restore()
-
-        # update dummies
-        # no need to, see variable useDummyData
-        #self.ringbuf_speed.append((ms(), h.valueMap(math.sin(math.cos(self.x*0.1)), -1, 1, SENSOR_SPEED_MIN, SENSOR_SPEED_MAX)))
-        #self.ringbuf_height.append((ms(), h.valueMap(self.x%RINGBUF_CAPACITY, 0, RINGBUF_CAPACITY, SENSOR_HEIGHT_MIN, SENSOR_HEIGHT_MAX)))
-
-        # no longer needed
-        #cr.save()
-        #self.drawOutlines(cr)
-        #cr.restore()
 
 
     # q: quaternion (x, y, z, w)
@@ -302,14 +258,12 @@ class PyApp(gtk.Window):
         # really?
 
         #print()
-        #print()
         # also print an info string if present
         if len(q) == 5:
-            print("Info: ", q[4])
+            print("Quaternion[4]: ", q[4])
         #print("Quaternion:      ", q)
         #print("Euler (°):       ", xyz)
         #print("Euler RPY (Rad): ", (roll, pitch, yaw))
-        #print("")
 
         mWidth = self.w/2
         mHeight = self.h/2
@@ -495,20 +449,6 @@ class PyApp(gtk.Window):
         cr.restore()
 
 
-    # returns a tuple (x, y, z, w)
-    def getNextSampleQuaternion(self):
-        self.qe1 += 0.05
-        self.qe2 += 0.03
-        self.qe3 += 0.07
-        #return h.Euler_toQuaternion(math.sin(self.qe1)*math.pi, math.cos(self.qe2)*math.pi, math.sin(self.qe3))
-        roll = -math.sin(self.qe1)*(math.pi/2)
-        pitch = math.sin(self.qe2)*(math.pi/2)
-        yaw = math.sin(self.qe3)
-
-
-        print("Input getNext... ", roll, pitch, yaw)
-        return h.Euler_toQuaternion(roll, pitch, yaw)
-
     def drawBackground(self, cr):
         cr.save()
         cr.set_source_rgb(0.9, 0.9, 0.9)
@@ -535,7 +475,7 @@ class PyApp(gtk.Window):
         self.drawTextAt(cr, "Height (m)", 0, -self.h / LINEAR_DIVIDER_HEIGHT * 1.2, 15, color=(0, 0, 1))
 
         # surrounding rect
-        print("drawSpeed")
+        # print("drawSpeed")
         cr.set_source_rgb(1, 0, 0)
         cr.rectangle(-self.w / LINEAR_DIVIDER_WIDTH, -self.h / LINEAR_DIVIDER_HEIGHT, self.w / LINEAR_DIVIDER_WIDTH * 2,
                      self.h / LINEAR_DIVIDER_HEIGHT * 2)
@@ -710,7 +650,7 @@ class PyApp(gtk.Window):
         self.drawTextAt(cr, "Speed (m/s)", 0, -self.h/LINEAR_DIVIDER_HEIGHT * 1.2, 15, color=(0, 0, 1))
 
         # surrounding rect
-        print("drawSpeed")
+        # print("drawSpeed")
         cr.set_source_rgb(1, 0, 0)
         cr.rectangle(-self.w/LINEAR_DIVIDER_WIDTH, -self.h/LINEAR_DIVIDER_HEIGHT, self.w/LINEAR_DIVIDER_WIDTH*2, self.h/LINEAR_DIVIDER_HEIGHT*2)
         cr.fill()
@@ -750,5 +690,5 @@ class PyApp(gtk.Window):
         gtk.main_quit()
 
 if __name__ == "__main__":
-    app = PyApp()
+    app = HeadUpDisplay()
     gtk.main()
