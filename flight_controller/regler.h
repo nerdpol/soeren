@@ -3,21 +3,21 @@
 */
 
 typedef struct {
-  uint16_t w;
-  uint16_t x;
+  int16_t w;
+  int16_t x;
   uint8_t Kp;
   uint8_t Ki;
   uint8_t Kd;
-  uint16_t esum;
-  uint16_t ealt;
+  int16_t esum;
+  int16_t ealt;
 
 } regler_param_t;
 
-uint16_t regler_fnc(regler_param_t* data,long Ta)
+int16_t regler_fnc(regler_param_t* data,long Ta)    // Ta sind Millisekunden
 {
-  uint16_t e = data->w -data->x;
+  int32_t e = data->w -data->x;
   data->esum=data->esum+e;
-  uint16_t y=data->Kp*e+data->Ki*Ta*data->esum+data->Kd/Ta*(e-data->ealt);
+  int32_t y=data->Kp*e/100 + data->Ki*Ta*data->esum/100 + data->Kd*(e-data->ealt)/Ta/100;
   data->ealt=e;
   return y;
 }

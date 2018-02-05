@@ -85,9 +85,9 @@ typedef struct {
 flightcontrol_sensors_t flightcontrol_sensors;
 
 regler_param_t params_reg_pitch = {
-  .w =0,
+  .w =-20,              //-20 Grad Neigung der Flugzeugnase 
   .x =0,
-  .Kp =0,
+  .Kp =100,
   .Ki =0,
   .Kd =0,
   .esum =0,
@@ -215,7 +215,7 @@ void loop() {
   if (now > next_reg_pitch) {
     next_reg_pitch = now + PERIOD_REG_PITCH;
     last_reg_pitch = next_reg_pitch;
-    uint16_t tmp = regler_fnc(&params_reg_pitch, next_reg_pitch-last_reg_pitch );
+    int16_t tmp = regler_fnc(&params_reg_pitch, next_reg_pitch-last_reg_pitch );
     last_reg_pitch = next_reg_pitch;
   }
 
