@@ -6,9 +6,10 @@
 UdpListener::UdpListener(QObject *parent, int udpPort) : QObject(parent)
 {
     udpSocket = new QUdpSocket(this);
-    udpSocket->bind(QHostAddress::LocalHost, udpPort);
+    udpSocket->bind(QHostAddress::AnyIPv4, udpPort);
     connect(udpSocket, SIGNAL(readyRead()),
             this, SLOT(readPendingDatagrams()));
+    qDebug() << "UdpListener started";
 }
 
 void UdpListener::readPendingDatagrams()

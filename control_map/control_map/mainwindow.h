@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QNetworkDatagram>
+#include <mymarblewidget.h>
 
 namespace Ui {
 class MainWindow;
@@ -19,8 +20,14 @@ public:
 public slots:
     void onDataPaket(QNetworkDatagram datagram);
 
+signals:
+    void onNewRealPoint(const QJsonObject & obj);
+
 private:
     Ui::MainWindow *ui;
+    MyMarbleWidget *mapWidget;
+
+    void startDummyTimer();
 };
 
 #endif // MAINWINDOW_H

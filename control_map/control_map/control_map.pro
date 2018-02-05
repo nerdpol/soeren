@@ -26,11 +26,13 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
-    udplistener.cpp
+    udplistener.cpp \
+    mymarblewidget.cpp
 
 HEADERS += \
         mainwindow.h \
-    udplistener.h
+    udplistener.h \
+    mymarblewidget.h
 
 FORMS += \
         mainwindow.ui

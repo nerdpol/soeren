@@ -5,13 +5,11 @@
 #include <QUdpSocket>
 #include <QNetworkDatagram>
 
-#define UDP_PORT 5005
-
 class UdpListener : public QObject
 {
     Q_OBJECT
 public:
-    explicit UdpListener(QObject *parent = nullptr, int port = UDP_PORT);
+    explicit UdpListener(QObject *parent, int port);
 
 signals:
 
