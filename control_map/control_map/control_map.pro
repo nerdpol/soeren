@@ -6,7 +6,7 @@
 
 QT       += core gui network Marble
 
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+greaterThan(QT_MAJOR_VERSION, 5): QT += widgets
 
 TARGET = control_map
 TEMPLATE = app
@@ -26,13 +26,13 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
-    udplistener.cpp \
-    mymarblewidget.cpp
+        udplistener.cpp \
+        mymarblewidget.cpp
 
 HEADERS += \
         mainwindow.h \
-    udplistener.h \
-    mymarblewidget.h
+        udplistener.h \
+        mymarblewidget.h
 
 FORMS += \
         mainwindow.ui

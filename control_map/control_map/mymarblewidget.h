@@ -2,8 +2,11 @@
 #define MYMARBLEWIDGET_H
 
 #include <marble/MarbleWidget.h>
+#include <marble/MarbleModel.h>
 #include <marble/GeoPainter.h>
 #include <marble/GeoDataTrack.h>
+#include <marble/RoutingManager.h>
+#include <marble/RouteRequest.h>
 #include <QNetworkDatagram>
 #include <iostream>
 #include <cstdlib>

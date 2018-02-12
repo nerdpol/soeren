@@ -20,6 +20,26 @@ MyMarbleWidget::MyMarbleWidget(QWidget * parent) : MarbleWidget(parent) {
         this->planned_track->addPoint(QDateTime::currentDateTime(), coord);
     }
 
+    this->setShowAtmosphere(true);
+    this->setShowRelief(true);
+    this->setShowFrameRate(true);
+
+    // Access the shared route request (start, destination and parameters)
+    RoutingManager* manager = this->model()->routingManager();
+    //this->model()
+    RouteRequest* request = manager->routeRequest();
+
+    // Use default routing settings for cars
+    request->setRoutingProfile( manager->defaultProfile( RoutingProfile::Pedestrian) );
+
+    // Set start and destination
+    request->append( GeoDataCoordinates( 8.38942, 48.99738, 0.0, GeoDataCoordinates::Degree ) );
+    request->append( GeoDataCoordinates( 8.42002, 49.0058, 0.0, GeoDataCoordinates::Degree ) );
+    request->append( GeoDataCoordinates( 8.43002, 49.0158, 0.0, GeoDataCoordinates::Degree ) );
+
+    // Calculate the route
+    manager->retrieveRoute();
+
 }
 
 void MyMarbleWidget::customPaint(GeoPainter* painter)
@@ -40,6 +60,7 @@ void MyMarbleWidget::customPaint(GeoPainter* painter)
 }
 
 
+
 /*
 gps:
   char: "G"
@@ -52,7 +73,7 @@ gps:
           - {type: "uint16_t", name: "velocity", unit: "1/100 m/s"}
 */
 void MyMarbleWidget::addRealPointAsJson(const QJsonObject &json) {
-    qDebug() << "addRealPointAsJson() -> " << json;
+    // qDebug() << "addRealPointAsJson() -> " << json;
     qreal lat = json["latitude"].toDouble();
     qreal lon = json["longitude"].toDouble();
 

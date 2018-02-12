@@ -3,7 +3,7 @@ import json
 import threading
 import time
 
-# map x in range in_min - in_max to the new range out_min - out_max 
+# map x in range in_min - in_max to the new range out_min - out_max
 def valueMap(x, in_min, in_max, out_min, out_max):
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
@@ -24,14 +24,15 @@ class UdpDummySender():
         self.cs.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
         self.load_gps_data()
 
-    def send_str(self, str):
+    def send_object(self, obj):
         """
         test out all paket types
 
         """
-        self.cs.sendto(json.dumps(str).encode(encoding='ascii'), ('255.255.255.255', 5005))
-        print("sending:", str)
-    
+        as_str = json.dumps(obj).encode(encoding='ascii')
+        self.cs.sendto(as_str, ('255.255.255.255', 5005))
+        print("sending:", as_str)
+
     def load_gps_data(self):
         with open('gps_data.json', 'r') as file:
             data = file.read()
@@ -39,10 +40,10 @@ class UdpDummySender():
 
     def send_gps_data(self, freq = 60):
         for payload in self.gps_data:
-            self.send_str(json.dumps(payload))
+            self.send_object(payload)
             time.sleep(1 / freq)
 
 if __name__ == '__main__':
     sender = UdpDummySender()
     while 1:
-        sender.send_gps_data(freq = 15)
+        sender.send_gps_data(freq = 60)

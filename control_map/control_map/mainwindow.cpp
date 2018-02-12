@@ -51,31 +51,28 @@ MainWindow::MainWindow(QWidget *parent) :
 
 // handle incoming pakets (to update the map etc)
 void MainWindow::onDataPaket(QNetworkDatagram datagram) {
-    std::cout << "UDP paket: " << datagram.data().data() << std::endl;
+    // std::cout << "UDP paket: " << datagram.data().data() << std::endl;
 
     // 1. parse json
     QJsonParseError err;
-    char * raw = datagram.data().data();
-    QString str = QString::fromUtf8(datagram.data());
+    QString str = datagram.data().data();
     QJsonDocument doc = QJsonDocument::fromJson(str.toUtf8(), &err);
-    qDebug() << "Error: " << err.errorString();
     if(doc.isNull()){
-        qDebug() << "Failed to create JSON doc.";
-        exit(2);
+        qDebug() << "UDP -> Failed to create JSON doc.";
+        return;
     }
     if(!doc.isObject()){
-        qDebug() << "JSON is not an object.";
-        exit(3);
+        qDebug() << "UDP -> JSON is not an object.";
+        return;
     }
     QJsonObject obj = doc.object();
-    qDebug() << "UDP -> Json object ->" << obj;
     if(obj["_type"].isString() && obj["_type"] == "gps") {
 
         // 2. notify if it is a suitable paket
         emit onNewRealPoint(doc.object());
 
     } else {
-        qDebug() << "unsuitable paket, _type=" << obj["_type"];
+        qDebug() << "UDP -> unsuitable paket, _type=" << obj["_type"];
     }
 }
 
